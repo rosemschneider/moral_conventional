@@ -185,8 +185,8 @@ iran.study.2 <- read.csv("../Data/Raw data/Study2/iran_study2_data.csv",
                          na.strings = c("", " ", "NA ", "NA", "#VALUE!"))
 
 iran.study.2 %<>%
-mutate(age = as.numeric(as.character(age)))%>% 
-  filter(is.na(age))%>% #one kid without dob
+  mutate(age = as.numeric(as.character(age)))%>% 
+  filter(!is.na(age))%>% #one kid without dob
   dplyr::rename("answer" = "score") %>%
   mutate(site = "Iran - Study 2")
 
