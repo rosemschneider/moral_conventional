@@ -124,20 +124,20 @@ missing.india.sids <- india.roster %>%
 
 #these are kids who only completed dictator game; we do not have data for them. Filter them out of roster.
 india.roster %<>%
-  filter(ID %!in% missing.india.sids.2$ID)
+  filter(ID %!in% missing.india.sids$ID)
 
 #update: get length of unique ids; we now have the same number of participants in each DF (217)
 data.mc.unique <- as.vector(unique(india.data$subid)) #length = 217 unique subids
 roster.mc.unique <- as.vector(unique(india.roster$ID)) #length = 217 unique subids
 
 ## dealing with kids who are coded 2x
-moral.conventional.check <- moral.conventional.india %>%
+moral.conventional.check <- india.data %>%
   group_by(subid)%>%
   summarise(n =n())%>%
   filter(n > 28) #n = 55 kids who were coded 2x
 
 #make sure their data is the same for both trials 
-double.data.check <- moral.conventional.india %>%
+double.data.check <- india.data %>%
   filter(subid %in% moral.conventional.check$subid)%>%
   group_by(subid, q, answer)%>%
   summarise(n = n()) %>%
