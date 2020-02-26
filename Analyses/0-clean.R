@@ -85,7 +85,10 @@ canada.data %<>%
 india.data <- read.csv("../Data/Raw data/Study1/india.csv", na.strings=c(""," ","NA", "NA "))%>%
   filter(task == "moral" | 
            task == "conv", 
-         is.na(mcsp_target)) #filter down only to moral/conventional data
+         is.na(mcsp_target)) %>% #filter down only to moral/conventional data
+  mutate(q_kind_num = ifelse(str_detect(q_kind, "0\\b", negate = FALSE), 1,
+                  ifelse(str_detect(q_kind, "1\\b", negate = FALSE), 2, 
+                         ifelse(str_detect(q_kind, "2\\b", negate = FALSE), 3, 0)))) ##THIS NEEDS TO BE FIXED
 
 #get unique SIDs from india.data
 data.mc.unique <- as.vector(unique(india.data$subid)) #length = 229 unique subids
@@ -173,6 +176,15 @@ india.data %<>%
 
 #merge everything together
 all.data <- bind_rows(india.data, iran.data, korea.data, canada.data)
+
+## deal with non-numeric answers
+non.num <- all.data %>%
+  mutate(answer.num = ifelse(answer == "Y", 1, 
+                             ifelse(answer == "N", 0, 
+                             ifelse(answer == "n", 0, 
+                                    ifelse(answer == "y", 1, 
+                                           ifelse(answer == "dk", NA, 
+                                                  ifelse(is.na(answer), NA, as.numeric(answer))))))))
 
 #save and export
 save(all.data, file="../Data/Cleaned data/Study1_MC_all_data.RData")
