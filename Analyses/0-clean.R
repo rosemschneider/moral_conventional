@@ -9,7 +9,9 @@ library(stringr)
 #filtering function
 '%!in%' <- function(x,y)!('%in%'(x,y))
 
-# Read in data ====
+# Study 1 ----
+
+# Read in Data
 ## Data needs to be read in separately for each country
 ## Cleaned and handled separately, and then combined at the end of this script
 
@@ -173,9 +175,22 @@ india.data %<>%
 all.data <- bind_rows(india.data, iran.data, korea.data, canada.data)
 
 #save and export
-save(all.data, file="../Data/Cleaned data/MC_all_data.RData")
+save(all.data, file="../Data/Cleaned data/Study1_MC_all_data.RData")
 
-#write to csv
-write.csv(all.data, file = '../Data/Cleaned data/MC_all_data.csv')
+write.csv(all.data, file="../Data/Cleaned data/Study1_MC_all_data.csv")
 
+# Study 2 ----
+#read in data 
+iran.study.2 <- read.csv("../Data/Raw data/Study2/iran_study2_data.csv",
+                         na.strings = c("", " ", "NA ", "NA", "#VALUE!"))
 
+iran.study.2 %<>%
+mutate(age = as.numeric(as.character(age)))%>% 
+  filter(is.na(age))%>% #one kid without dob
+  dplyr::rename("answer" = "score") %>%
+  mutate(site = "Iran - Study 2")
+
+#save and export
+save(iran.study.2, file="../Data/Cleaned data/Study2_MC_iran.RData")
+
+write.csv(iran.study.2, file="../Data/Cleaned data/Study2_MC_iran.csv")
