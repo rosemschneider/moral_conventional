@@ -85,10 +85,16 @@ canada.data %<>%
 india.data <- read.csv("../Data/Raw data/Study1/india.csv", na.strings=c(""," ","NA", "NA "))%>%
   filter(task == "moral" | 
            task == "conv", 
-         is.na(mcsp_target)) %>% #filter down only to moral/conventional data
-  mutate(q_kind_num = ifelse(str_detect(q_kind, "0\\b", negate = FALSE), 1,
-                  ifelse(str_detect(q_kind, "1\\b", negate = FALSE), 2, 
-                         ifelse(str_detect(q_kind, "2\\b", negate = FALSE), 3, 0)))) ##THIS NEEDS TO BE FIXED
+         is.na(mcsp_target)) %>%
+  droplevels() %>%#filter down only to moral/conventional data
+  mutate(q = ifelse((task == "moral" & item == "push"), 1, 
+                       ifelse((task == "moral" & item == "namecall"), 2,
+                              ifelse((task == "moral" & item == "rip"),  3, 
+                                     ifelse((task == "conv" & item == "shoes"), 1, 
+                                            ifelse((task == "conv" & item == "swim"), 2, 
+                                                   ifelse((task == "conv" & item == "teachername"), 3, 4)))))))%>%
+  mutate(q_kind = str_extract(q_kind, "(\\d)+"))
+
 
 #get unique SIDs from india.data
 data.mc.unique <- as.vector(unique(india.data$subid)) #length = 229 unique subids
@@ -165,9 +171,7 @@ india.data <- left_join(india.data, india.sid.age, by = "subid")
 #renaming and selecting the right columns
 india.data %<>%
   dplyr::select(subid, age, task, item, q, q_kind, answer, task_num)%>%
-  mutate(q = as.numeric(as.character(substr(q, 2, 2))), 
-         q_kind = as.numeric(as.character(substr(q_kind, 1,1))), 
-         site = "India", 
+  mutate(site = "India", 
          age = as.numeric(as.character(age)))%>%
   filter(task != "practice") # filter out practice
 
