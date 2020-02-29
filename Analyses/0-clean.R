@@ -22,6 +22,7 @@ korea.data %<>%
   dplyr::select(subid, age, age_group, task, q, q_kind, score, task_num)%>%
   filter(task == "moral" | 
            task == "conv")%>%
+  droplevels()%>%
   dplyr::rename("answer" = "score")%>%
   mutate(site = "Korea")
 
@@ -32,7 +33,11 @@ korea.data %<>%
                               ifelse((task == "moral" & q == 3),  "rip", 
                                      ifelse((task == "conv" & q == 1), "shoes", 
                                             ifelse((task == "conv" & q == 2), "swim", 
-                                                   ifelse((task == "conv" & q == 3), "teachername", "toy")))))))
+                                                   ifelse((task == "conv" & q == 3), "teachername", "toy")))))), 
+         answer = ifelse(answer == "n", 0, 
+                         ifelse(answer == "y", 1, 
+                         ifelse(answer == "dk", NA, as.character(answer)))),
+         answer = as.numeric(as.character(answer)))
 
 ## Iranian Data ===
 #add q_kind convention
@@ -47,7 +52,10 @@ iran.data %<>%
 #update to fit convention for merging
 iran.data %<>%
   dplyr::select(subid, age, age_group, task, q, q_kind, score, task_num)%>%
-  mutate(site = "Iran") %>%
+  mutate(site = "Iran", 
+         score = ifelse(score == "N", 0, 
+                        ifelse(score == "Y", 1, as.character(score))), 
+         score = as.numeric(as.character(score))) %>%
   filter(task == "moral" | 
            task == "conv")%>%
   dplyr::rename("answer" = "score")
@@ -72,7 +80,9 @@ canada.data %<>%
                               ifelse((task == "moral" & q == 3),  "rip", 
                                      ifelse((task == "conv" & q == 1), "shoes", 
                                             ifelse((task == "conv" & q == 2), "swim", 
-                                                   ifelse((task == "conv" & q == 3), "teachername", "toy")))))))
+                                                   ifelse((task == "conv" & q == 3), "teachername", "toy")))))))%>%
+  mutate(answer = ifelse(answer == "N", 0, 
+                         ifelse(answer =="Y", 1, answer)))
 
 #canada
 canada.data %<>%
@@ -172,7 +182,9 @@ india.data <- left_join(india.data, india.sid.age, by = "subid")
 india.data %<>%
   dplyr::select(subid, age, task, item, q, q_kind, answer, task_num)%>%
   mutate(site = "India", 
-         age = as.numeric(as.character(age)))%>%
+         answer = as.numeric(as.character(answer)),
+         age = as.numeric(as.character(age)), 
+         q_kind = as.numeric(q_kind))%>%
   filter(task != "practice") # filter out practice
 
 # Merging data ====
@@ -182,8 +194,8 @@ india.data %<>%
 all.data <- bind_rows(india.data, iran.data, korea.data, canada.data)
 
 ## deal with non-numeric answers
-non.num <- all.data %>%
-  mutate(answer.num = ifelse(answer == "Y", 1, 
+all.data %<>%
+  mutate(answer = ifelse(answer == "Y", 1, 
                              ifelse(answer == "N", 0, 
                              ifelse(answer == "n", 0, 
                                     ifelse(answer == "y", 1, 
