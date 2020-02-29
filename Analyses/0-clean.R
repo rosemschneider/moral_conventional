@@ -162,18 +162,34 @@ double.data.check <- india.data %>%
   summarise(n = n()) %>%
   filter(n < 2) #A0603 suspect
 
+# remove extraneous data by only taking kids with unique values with everything
+india.data %<>%
+  distinct(subid, task, item, q, q_kind, answer, task_num)
+
+#check for double coding again
+moral.conventional.check <- india.data %>%
+  group_by(subid)%>%
+  summarise(n =n())%>%
+  filter(n > 28) #n = 2 kids who were coded 2x
+
+#remove these 2 kids from data
+
 ## Filtering out this kiddo from data and roster
 india.data %<>%
-  filter(subid %!in% double.data.check$subid)
+  filter(subid %!in% moral.conventional.check$subid)
 
 india.roster %<>%
-  filter(ID %!in% double.data.check$subid)
+  filter(ID %!in% moral.conventional.check$subid)
 
 # Pulling out the age information to add to data frame
 #pull out unique SID and age
 india.sid.age <- india.roster %>%
   distinct(ID, age)%>%
   dplyr::rename("subid" = "ID")
+
+#update: get length of unique ids; we now have the same number of participants in each DF (217)
+data.mc.unique <- as.vector(unique(india.data$subid)) #length = 215 unique subids
+roster.mc.unique <- as.vector(unique(india.roster$ID)) #length = 215 unique subids
 
 ##left join by subid for age for the full india dataset
 india.data <- left_join(india.data, india.sid.age, by = "subid")
@@ -186,6 +202,33 @@ india.data %<>%
          age = as.numeric(as.character(age)), 
          q_kind = as.numeric(q_kind))%>%
   filter(task != "practice") # filter out practice
+
+##NAs in data %>%
+na.check <- india.data %>%
+  mutate(answer = factor(answer))%>%
+  group_by(subid, answer)%>%
+  summarise(n = n())%>%
+  filter(is.na(answer))
+
+##it looks like some kids did not have a complete dataset. Let's identify them.
+incomplete <- india.data %>%
+  mutate(missing.data = ifelse(is.na(answer), "MISSING", "NOT_MISSING"))%>%
+  group_by(subid, missing.data)%>%
+  summarise(n= n())%>%
+  pivot_wider(names_from = missing.data, 
+              values_from = n)%>%
+  mutate(MISSING = ifelse(is.na(MISSING), 0, as.numeric(as.character(MISSING))), 
+         NOT_MISSING = ifelse(is.na(NOT_MISSING), 0, as.numeric(as.character(NOT_MISSING))))%>%
+  mutate(prop.missing = MISSING/28, 
+         prop.data = NOT_MISSING/28)
+
+#how many kids have less than 80% of data 
+max.missing <- incomplete %>%
+  filter(prop.data < .80)
+
+##filter out kids who are missing more than 20% of their data
+india.data %<>%
+  filter(subid %!in% max.missing$subid)
 
 # Merging data ====
 #names: subid, age, task, item, q, q_kind, answer, task_num, site
@@ -201,6 +244,25 @@ all.data %<>%
                                     ifelse(answer == "y", 1, 
                                            ifelse(answer == "dk", NA, 
                                                   ifelse(is.na(answer), NA, as.numeric(answer))))))))
+
+#globally check for missing data 
+incomplete <- all.data %>%
+  mutate(missing.data = ifelse(is.na(answer), "MISSING", "NOT_MISSING"))%>%
+  group_by(subid, missing.data)%>%
+  summarise(n= n())%>%
+  pivot_wider(names_from = missing.data, 
+              values_from = n)%>%
+  mutate(MISSING = ifelse(is.na(MISSING), 0, as.numeric(as.character(MISSING))), 
+         NOT_MISSING = ifelse(is.na(NOT_MISSING), 0, as.numeric(as.character(NOT_MISSING))))%>%
+  mutate(prop.missing = MISSING/28, 
+         prop.data = NOT_MISSING/28)
+
+max.missing <- incomplete %>%
+  filter(prop.data < .80)
+
+#remove these kids from full data frame
+all.data %<>%
+  filter(subid %!in% max.missing$subid)
 
 #save and export
 save(all.data, file="../Data/Cleaned data/Study1_MC_all_data.RData")
