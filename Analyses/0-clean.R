@@ -289,6 +289,10 @@ iran.study.2 %<>%
   dplyr::rename("answer" = "score") %>%
   mutate(site = "Iran - Study 2")
 
+#fix one miscoding - one kid had rating has 20, but should be 2 (confirmed on paper data)
+iran.study.2 %<>%
+  mutate(answer = ifelse(answer == 20, 2, answer))
+
 #save and export
 save(iran.study.2, file="../Data/Cleaned data/Study2_MC_iran.RData")
 
