@@ -264,6 +264,15 @@ max.missing <- incomplete %>%
 all.data %<>%
   filter(subid %!in% max.missing$subid)
 
+#now check to make sure these kids have ratings data 
+ratings.check <- all.data %>%
+  filter(is.na(answer), 
+         q_kind == 0) #n = 11 kids without ratings data - only one is missing two ratings. 
+        #Exclude that kid (A0208), keep the remainder.
+
+all.data %<>%
+  filter(subid != "A0208")
+
 #save and export
 save(all.data, file="../Data/Cleaned data/Study1_MC_all_data.RData")
 
