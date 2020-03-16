@@ -303,6 +303,22 @@ all.data %<>%
          task_num = factor(task_num), 
          site = factor(site))
 
+##filter out kids > 10 in india
+all.data %<>%
+  filter(age <= 11)
+
+##create age group and scaled/centered age varia ble
+all.data %<>%
+  mutate(age.group.floor = factor(floor(age)), 
+         age.c = as.vector(scale(age, center = TRUE, scale = TRUE)))
+
+##add q_kind labels for graphs
+all.data %<>%
+  mutate(q_kind_label = ifelse(q_kind == 0, "Severity rating", 
+         ifelse(q_kind == 1, "Faraway country", 
+                ifelse(q_kind == 2, "Rule at school", "Everyone else"))))
+         
+
 #save and export
 save(all.data, file="../Data/Cleaned data/Study1_MC_all_data.RData")
 
@@ -322,6 +338,22 @@ iran.study.2 %<>%
 #fix one miscoding - one kid had rating has 20, but should be 2 (confirmed on paper data)
 iran.study.2 %<>%
   mutate(answer = ifelse(answer == 20, 2, answer))
+
+#center age, group age
+iran.study.2 %<>%
+  mutate(age.group.floor = factor(floor(age)), 
+         age.c = as.vector(scale(age, center = TRUE, scale = TRUE)))
+
+##add q_kind labels for graphs
+iran.study.2 %<>%
+  mutate(q_kind_label = ifelse(q_kind == 0, "Severity rating", 
+                               ifelse(q_kind == 1, "Farawary country", 
+                                      ifelse(q_kind == 2, "Rule at school", 
+                                             ifelse(q_kind == 3, "Everyone else", 
+                                                    ifelse(q_kind == 4, "Foreigner", 
+                                                           ifelse(q_kind == 5, "Non-muslim", 
+                                                                  ifelse(q_kind == 6, "Haram", 
+                                                                         ifelse(q_kind == 7, "Illegal", "Zesht")))))))))
 
 #save and export
 save(iran.study.2, file="../Data/Cleaned data/Study2_MC_iran.RData")
