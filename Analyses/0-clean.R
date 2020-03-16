@@ -9,6 +9,31 @@ library(stringr)
 #filtering function
 '%!in%' <- function(x,y)!('%in%'(x,y))
 
+# NB
+# There are different question types for each question. 
+# 0 corresponds to base question: 1-6 scale (how bad/good is this)?
+# 1: Would it be okay in a faraway country?
+# 2: Would it be okay if there were a rule at school?
+# 3: Would it be okay if everyone else were doing it? 
+
+#There 2 different transgression types for study 1: 
+# Moral, conventional
+
+#There are 4 different transgression types for study 2: 
+# Moral, conventional, convention-iran, religious
+
+#There are different items within each transgression type: 
+#Moral
+#1. push - protagonist pushed a child down
+#2. namecall: protagonist called a child a bad name 
+#3. rip - protagonist ripped a child’s drawing 
+
+#Conventional:
+#1. shoes - protagonist put shoes up lunch table
+#2. swim - protagonist wore swimsuit to school 
+#3. teachername - protagonist called teacher by first name 
+#4. toy - protagonist didn’t clean up toys 
+
 # Study 1 ----
 
 # Read in Data
@@ -104,7 +129,6 @@ india.data <- read.csv("../Data/Raw data/Study1/india.csv", na.strings=c(""," ",
                                             ifelse((task == "conv" & item == "swim"), 2, 
                                                    ifelse((task == "conv" & item == "teachername"), 3, 4)))))))%>%
   mutate(q_kind = str_extract(q_kind, "(\\d)+"))
-
 
 #get unique SIDs from india.data
 data.mc.unique <- as.vector(unique(india.data$subid)) #length = 229 unique subids
@@ -272,6 +296,12 @@ ratings.check <- all.data %>%
 
 all.data %<>%
   filter(subid != "A0208")
+
+all.data %<>%
+  mutate(task = factor(task), 
+         item = factor(item), 
+         task_num = factor(task_num), 
+         site = factor(site))
 
 #save and export
 save(all.data, file="../Data/Cleaned data/Study1_MC_all_data.RData")
