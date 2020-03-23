@@ -10,6 +10,11 @@ library(stringr)
 '%!in%' <- function(x,y)!('%in%'(x,y))
 
 # NB
+#Some subids have been further de-identified to ensure that participants cannot be identified. 
+#Original and random SID are matched in a file stored on LADLab-internal server.
+#Some DOBs and sex information are pulled from external roster, if they have were recorded on original data;
+#All original rosters and identified data stored on LADLab-internal server. 
+
 # There are different question types for each question. 
 # 0 corresponds to base question: 1-6 scale (how bad/good is this)?
 # 1: Would it be okay in a faraway country?
@@ -44,7 +49,7 @@ library(stringr)
 korea.data <- read.csv('../Data/Raw data/Study1/korea.csv', na.strings=c(""," ","NA", "NA "))
 
 korea.data %<>%
-  dplyr::select(subid, age, age_group, task, q, q_kind, score, task_num)%>%
+  dplyr::select(subid, age, age_group, task, q, q_kind, score, task_num, sex)%>%
   filter(task == "moral" | 
            task == "conv")%>%
   droplevels()%>%
@@ -76,7 +81,7 @@ iran.data %<>%
 
 #update to fit convention for merging
 iran.data %<>%
-  dplyr::select(subid, age, age_group, task, q, q_kind, score, task_num)%>%
+  dplyr::select(subid, age, age_group, task, q, q_kind, score, task_num, sex)%>%
   mutate(site = "Iran", 
          score = ifelse(score == "N", 0, 
                         ifelse(score == "Y", 1, as.character(score))), 
@@ -111,7 +116,7 @@ canada.data %<>%
 
 #canada
 canada.data %<>%
-  dplyr::select(subid, age, task, item, q, q_kind, answer, task_num)%>%
+  dplyr::select(subid, age, task, item, q, q_kind, answer, task_num, sex)%>%
   mutate(site = "Canada", 
          age = as.numeric(as.character(age)))
 
@@ -205,11 +210,12 @@ india.data %<>%
 india.roster %<>%
   filter(ID %!in% moral.conventional.check$subid)
 
-# Pulling out the age information to add to data frame
+# Pulling out the age and sex information to add to data frame
 #pull out unique SID and age
 india.sid.age <- india.roster %>%
-  distinct(ID, age)%>%
-  dplyr::rename("subid" = "ID")
+  distinct(ID, age, Gender)%>%
+  dplyr::rename("subid" = "ID", 
+                "sex" = "Gender")
 
 #update: get length of unique ids; we now have the same number of participants in each DF (217)
 data.mc.unique <- as.vector(unique(india.data$subid)) #length = 215 unique subids
@@ -220,7 +226,7 @@ india.data <- left_join(india.data, india.sid.age, by = "subid")
 
 #renaming and selecting the right columns
 india.data %<>%
-  dplyr::select(subid, age, task, item, q, q_kind, answer, task_num)%>%
+  dplyr::select(subid, age, task, item, q, q_kind, answer, task_num, sex)%>%
   mutate(site = "India", 
          answer = as.numeric(as.character(answer)),
          age = as.numeric(as.character(age)), 
