@@ -46,7 +46,7 @@ library(stringr)
 ## Cleaned and handled separately, and then combined at the end of this script
 
 ## Korean Data ====
-korea.data <- read.csv('../Data/Raw data/Study1/korea.csv', na.strings=c(""," ","NA", "NA "))
+korea.data <- read.csv('../Data/Raw data/Study1/korea.csv')
 
 korea.data %<>%
   dplyr::select(subid, age, age_group, task, q, q_kind, score, task_num, sex)%>%
@@ -71,7 +71,7 @@ korea.data %<>%
 
 ## Iranian Data ===
 #add q_kind convention
-iran.data <- read.csv('../Data/Raw data/Study1/iran.csv', na.strings=c(""," ","NA", "NA "))
+iran.data <- read.csv('../Data/Raw data/Study1/iran.csv')
 
 #add q_kind column based on task number
 iran.data %<>%
@@ -99,6 +99,7 @@ iran.data %<>%
                                             ifelse((task == "conv" & q == 2), "swim", 
                                                    ifelse((task == "conv" & q == 3), "teachername", "toy")))))))
 
+
 ## Canadian Data ====
 ##canada data
 canada.data <- read.csv("../Data/Raw data/Study1/canada.csv")
@@ -122,7 +123,7 @@ canada.data %<>%
 
 ## Indian Data ====
 #read in data from India; this does not have ages attached
-india.data <- read.csv("../Data/Raw data/Study1/india.csv", na.strings=c(""," ","NA", "NA "))%>%
+india.data <- read.csv("../Data/Raw data/Study1/india.csv")%>%
   filter(task == "moral" | 
            task == "conv", 
          is.na(mcsp_target)) %>%
@@ -242,19 +243,18 @@ na.check <- india.data %>%
 
 ##it looks like some kids did not have a complete dataset. Let's identify them.
 incomplete <- india.data %>%
+  filter(q_kind == 0)%>%
   mutate(missing.data = ifelse(is.na(answer), "MISSING", "NOT_MISSING"))%>%
   group_by(subid, missing.data)%>%
   summarise(n= n())%>%
   pivot_wider(names_from = missing.data, 
               values_from = n)%>%
   mutate(MISSING = ifelse(is.na(MISSING), 0, as.numeric(as.character(MISSING))), 
-         NOT_MISSING = ifelse(is.na(NOT_MISSING), 0, as.numeric(as.character(NOT_MISSING))))%>%
-  mutate(prop.missing = MISSING/28, 
-         prop.data = NOT_MISSING/28)
+         NOT_MISSING = ifelse(is.na(NOT_MISSING), 0, as.numeric(as.character(NOT_MISSING))))
 
 #how many kids have less than 80% of data 
 max.missing <- incomplete %>%
-  filter(prop.data < .80)
+  filter(MISSING >= 2)
 
 ##filter out kids who are missing more than 20% of their data
 india.data %<>%
@@ -277,18 +277,17 @@ all.data %<>%
 
 #globally check for missing data 
 incomplete <- all.data %>%
+  filter(q_kind == 0)%>%
   mutate(missing.data = ifelse(is.na(answer), "MISSING", "NOT_MISSING"))%>%
   group_by(subid, missing.data)%>%
   summarise(n= n())%>%
   pivot_wider(names_from = missing.data, 
               values_from = n)%>%
   mutate(MISSING = ifelse(is.na(MISSING), 0, as.numeric(as.character(MISSING))), 
-         NOT_MISSING = ifelse(is.na(NOT_MISSING), 0, as.numeric(as.character(NOT_MISSING))))%>%
-  mutate(prop.missing = MISSING/28, 
-         prop.data = NOT_MISSING/28)
+         NOT_MISSING = ifelse(is.na(NOT_MISSING), 0, as.numeric(as.character(NOT_MISSING))))
 
 max.missing <- incomplete %>%
-  filter(prop.data < .80)
+  filter(MISSING >= 2)
 
 #remove these kids from full data frame
 all.data %<>%
@@ -309,14 +308,14 @@ all.data %<>%
          task_num = factor(task_num), 
          site = factor(site))
 
+#create age groups and age center
+all.data %<>%
+  mutate(age.group = ifelse(age %% 1 >= 0.9, round(age), floor(age)), 
+         age.c = as.vector(scale(age, center = TRUE, scale = TRUE)))
+
 ##filter out kids > 10 in india
 all.data %<>%
-  filter(age <= 11)
-
-##create age group and scaled/centered age varia ble
-all.data %<>%
-  mutate(age.group.floor = factor(floor(age)), 
-         age.c = as.vector(scale(age, center = TRUE, scale = TRUE)))
+  filter(age <= 11 | is.na(age))
 
 ##add q_kind labels for graphs
 all.data %<>%
@@ -338,7 +337,8 @@ iran.study.2 <- read.csv("../Data/Raw data/Study2/iran_study2_data.csv",
 iran.study.2 %<>%
   mutate(age = as.numeric(as.character(age)))%>% 
   filter(!is.na(age))%>% #one kid without dob
-  dplyr::rename("answer" = "score") %>%
+  dplyr::rename("answer" = "score", 
+                "sex" = "gender") %>%
   mutate(site = "Iran - Study 2")
 
 #fix one miscoding - one kid had rating has 20, but should be 2 (confirmed on paper data)
@@ -347,8 +347,8 @@ iran.study.2 %<>%
 
 #center age, group age
 iran.study.2 %<>%
-  mutate(age.group.floor = factor(floor(age)), 
-         age.c = as.vector(scale(age, center = TRUE, scale = TRUE)))
+  mutate(age.group = ifelse(age %% 1 >= 0.9, round(age), floor(age)), 
+         age.c = as.vector(scale(age, center = TRUE, scale = TRUE))) 
 
 ##add q_kind labels for graphs
 iran.study.2 %<>%
@@ -363,5 +363,17 @@ iran.study.2 %<>%
 
 #save and export
 save(iran.study.2, file="../Data/Cleaned data/Study2_MC_iran.RData")
-
+ 
 write.csv(iran.study.2, file="../Data/Cleaned data/Study2_MC_iran.csv")
+
+##for sanity check
+tmp <- all.data %>%
+  group_by(subid)%>%
+  summarise(n = n())
+
+s1_distinct <- all.data %>%
+  distinct(subid, site)
+
+write.csv(s1_distinct, file = "../Data/sanity check/distinct_subs.csv")
+
+
