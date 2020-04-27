@@ -322,6 +322,11 @@ all.data %<>%
   mutate(q_kind_label = ifelse(q_kind == 0, "Severity rating", 
          ifelse(q_kind == 1, "Faraway country", 
                 ifelse(q_kind == 2, "Rule at school", "Everyone else"))))
+
+## finally, manual change for one kid who has 0 instead of 1 for lowest rating
+all.data %<>%
+  mutate(answer =ifelse((subid == "A0503" & q_kind == 0 & (q == 2 | 
+                             q == 3 | q == 4)), 1, answer))
          
 
 #save and export
