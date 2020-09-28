@@ -46,7 +46,7 @@ library(stringr)
 ## Cleaned and handled separately, and then combined at the end of this script
 
 ## Korean Data ====
-korea.data <- read.csv('../Data/Raw data/Study1/korea.csv')
+korea.data <- read.csv(here::here('Data/Raw data/Study1/korea.csv'))
 
 korea.data %<>%
   dplyr::select(subid, age, age_group, task, q, q_kind, score, task_num, sex)%>%
@@ -71,7 +71,7 @@ korea.data %<>%
 
 ## Iranian Data ===
 #add q_kind convention
-iran.data <- read.csv('../Data/Raw data/Study1/iran.csv')
+iran.data <- read.csv(here::here('Data/Raw data/Study1/iran.csv'))
 
 #add q_kind column based on task number
 iran.data %<>%
@@ -102,7 +102,7 @@ iran.data %<>%
 
 ## Canadian Data ====
 ##canada data
-canada.data <- read.csv("../Data/Raw data/Study1/canada.csv")
+canada.data <- read.csv(here::here("/Data/Raw data/Study1/canada.csv"))
 
 #add question naming convention
 canada.data %<>%
@@ -123,7 +123,7 @@ canada.data %<>%
 
 ## Indian Data ====
 #read in data from India; this does not have ages attached
-india.data <- read.csv("../Data/Raw data/Study1/india.csv")%>%
+india.data <- read.csv(here::here("Data/Raw data/Study1/india.csv"))%>%
   filter(task == "moral" | 
            task == "conv", 
          is.na(mcsp_target)) %>%
@@ -144,7 +144,7 @@ data.mc.unique <- as.vector(unique(india.data$subid)) #length = 229 unique subid
 ## Note: Ages were calculated from a private full roster that has both testing date and DOB. 
 ## Note: Exact DOT not known, calculated as the average of dates that experimenters were testing
 ## Note: This roster contains only a subset of children; others were tested on other studies
-india.roster <- read.csv("../Data/Raw data/Study1/india_mc_roster.csv", na.strings=c(""," ","NA", "NA ", "#VALUE!"))
+india.roster <- read.csv("Data/Raw data/Study1/india_mc_roster.csv", na.strings=c(""," ","NA", "NA ", "#VALUE!"))
 
 #clean india roster to remove NAs and obviously incorrect ages
 india.roster %<>%
@@ -330,13 +330,13 @@ all.data %<>%
          
 
 #save and export
-save(all.data, file="../Data/Cleaned data/Study1_MC_all_data.RData")
+save(all.data, file="Data/Cleaned data/Study1_MC_all_data.RData")
 
-write.csv(all.data, file="../Data/Cleaned data/Study1_MC_all_data.csv")
+write.csv(all.data, file="Data/Cleaned data/Study1_MC_all_data.csv")
 
 # Study 2 ----
 #read in data 
-iran.study.2 <- read.csv("../Data/Raw data/Study2/iran_study2_data.csv",
+iran.study.2 <- read.csv("Data/Raw data/Study2/iran_study2_data.csv",
                          na.strings = c("", " ", "NA ", "NA", "#VALUE!"))
 
 iran.study.2 %<>%
@@ -367,9 +367,9 @@ iran.study.2 %<>%
                                                                          ifelse(q_kind == 7, "Illegal", "Zesht")))))))))
 
 #save and export
-save(iran.study.2, file="../Data/Cleaned data/Study2_MC_iran.RData")
+save(iran.study.2, file="Data/Cleaned data/Study2_MC_iran.RData")
  
-write.csv(iran.study.2, file="../Data/Cleaned data/Study2_MC_iran.csv")
+write.csv(iran.study.2, file="Data/Cleaned data/Study2_MC_iran.csv")
 
 ##for sanity check
 tmp <- all.data %>%
@@ -379,6 +379,6 @@ tmp <- all.data %>%
 s1_distinct <- all.data %>%
   distinct(subid, site)
 
-write.csv(s1_distinct, file = "../Data/sanity check/distinct_subs.csv")
+write.csv(s1_distinct, file = "Data/sanity check/distinct_subs.csv")
 
 
