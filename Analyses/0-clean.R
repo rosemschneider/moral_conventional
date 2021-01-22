@@ -183,7 +183,7 @@ roster.mc.unique <- as.vector(unique(india.roster$ID)) #length = 217 unique subi
 moral.conventional.check <- india.data %>%
   group_by(subid)%>%
   summarise(n =n())%>%
-  filter(n > 28) #n = 55 kids who were coded 2x
+  filter(n > 28) #n = 53 kids who were coded 2x
 
 #make sure their data is the same for both trials 
 double.data.check <- india.data %>%
@@ -204,25 +204,26 @@ moral.conventional.check <- india.data %>%
 
 #remove these 2 kids from data
 
-## Filtering out this kiddo from data and roster
+## Filtering out these 2 kiddos from data and roster
 india.data %<>%
   filter(subid %!in% moral.conventional.check$subid)
 
+#filtering from the roster too
 india.roster %<>%
   filter(ID %!in% moral.conventional.check$subid)
 
-# Pulling out the age and sex information to add to data frame
+# Finally, let's pull out the age and sex information to add to data frame
 #pull out unique SID and age
 india.sid.age <- india.roster %>%
   distinct(ID, age, Gender)%>%
   dplyr::rename("subid" = "ID", 
                 "sex" = "Gender")
 
-#update: get length of unique ids; we now have the same number of participants in each DF (217)
+#sanity check: get length of unique ids in data and roster; we now have the same number of participants in each DF (215)
 data.mc.unique <- as.vector(unique(india.data$subid)) #length = 215 unique subids
 roster.mc.unique <- as.vector(unique(india.roster$ID)) #length = 215 unique subids
 
-##left join by subid for age for the full india dataset
+##Okay! We can finally combine these with left join by subid for age for the full india dataset
 india.data <- left_join(india.data, india.sid.age, by = "subid")
 
 #renaming and selecting the right columns
@@ -234,7 +235,7 @@ india.data %<>%
          q_kind = as.numeric(q_kind))%>%
   filter(task != "practice") # filter out practice
 
-##NAs in data %>%
+##NAs in data - we need to make sure that everyone has a complete dataset
 na.check <- india.data %>%
   mutate(answer = factor(answer))%>%
   group_by(subid, answer)%>%
@@ -252,13 +253,15 @@ incomplete <- india.data %>%
   mutate(MISSING = ifelse(is.na(MISSING), 0, as.numeric(as.character(MISSING))), 
          NOT_MISSING = ifelse(is.na(NOT_MISSING), 0, as.numeric(as.character(NOT_MISSING))))
 
-#how many kids have less than 80% of data 
+#how many kids have less than 80% of data - this is looking at the MAIN question (ratings)
 max.missing <- incomplete %>%
   filter(MISSING >= 2)
 
 ##filter out kids who are missing more than 20% of their data
 india.data %<>%
   filter(subid %!in% max.missing$subid)
+
+## Phew, at this point, India data is finished
 
 # Merging data ====
 #names: subid, age, task, item, q, q_kind, answer, task_num, site
@@ -275,7 +278,7 @@ all.data %<>%
                                            ifelse(answer == "dk", NA, 
                                                   ifelse(is.na(answer), NA, as.numeric(answer))))))))
 
-#globally check for missing data 
+#globally check for missing data - again, this is looking at the MAIN question
 incomplete <- all.data %>%
   filter(q_kind == 0)%>%
   mutate(missing.data = ifelse(is.na(answer), "MISSING", "NOT_MISSING"))%>%
@@ -287,7 +290,7 @@ incomplete <- all.data %>%
          NOT_MISSING = ifelse(is.na(NOT_MISSING), 0, as.numeric(as.character(NOT_MISSING))))
 
 max.missing <- incomplete %>%
-  filter(MISSING >= 2)
+  filter(MISSING >= 2) # three participants missing more than 20% of their data
 
 #remove these kids from full data frame
 all.data %<>%
@@ -300,20 +303,21 @@ ratings.check <- all.data %>%
         #Exclude that kid (A0208), keep the remainder.
 
 all.data %<>%
-  filter(subid != "A0208")
+  filter(subid != "A0208") #at this point they are already excluded, but just keep in here for sanity
 
+## some data manipulations ====
 all.data %<>%
   mutate(task = factor(task), 
          item = factor(item), 
          task_num = factor(task_num), 
          site = factor(site))
 
-#create age groups and age center
+#create age groups and age center for analyses
 all.data %<>%
   mutate(age.group = ifelse(age %% 1 >= 0.9, round(age), floor(age)), 
          age.c = as.vector(scale(age, center = TRUE, scale = TRUE)))
 
-##filter out kids > 10 in india
+##filter out kids > 10 in india (and anywhere else)
 all.data %<>%
   filter(age <= 11 | is.na(age))
 
@@ -339,6 +343,7 @@ write.csv(all.data, file="Data/Cleaned data/Study1_MC_all_data.csv")
 iran.study.2 <- read.csv("Data/Raw data/Study2/iran_study2_data.csv",
                          na.strings = c("", " ", "NA ", "NA", "#VALUE!"))
 
+# some minor renaming and changes
 iran.study.2 %<>%
   mutate(age = as.numeric(as.character(age)))%>% 
   filter(!is.na(age))%>% #one kid without dob
