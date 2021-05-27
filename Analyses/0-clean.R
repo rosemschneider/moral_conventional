@@ -1,9 +1,10 @@
-#Data cleaning script for cross-cultural moral conventional study
+#Data cleaning script for cross-cultural moral conventional study (Yazdi et al.)
+## Rose M. Schneider
 
 rm(list = ls())
 library(tidyverse)
 library(magrittr)
-library(tidylog)
+# library(tidylog)
 library(stringr)
 
 #filtering function
@@ -36,7 +37,7 @@ library(stringr)
 #Conventional:
 #1. shoes - protagonist put shoes up lunch table
 #2. swim - protagonist wore swimsuit to school 
-#3. teachername - protagonist called teacher by first name 
+#3. teachername - protagonist called teacher by first name ##### NB 5.25.21 - this will be excluded from primary analyses
 #4. toy - protagonist didn’t clean up toys 
 
 # Study 1 ----
@@ -97,7 +98,8 @@ iran.data %<>%
                               ifelse((task == "moral" & q == 3),  "rip", 
                                      ifelse((task == "conv" & q == 1), "shoes", 
                                             ifelse((task == "conv" & q == 2), "swim", 
-                                                   ifelse((task == "conv" & q == 3), "teachername", "toy")))))))
+                                                   ifelse((task == "conv" & q == 3), "teachername", "toy")))))))%>%
+  mutate(task = ifelse(item == "toy", "conv", as.character(task)))
 
 
 ## Canadian Data ====
@@ -144,10 +146,11 @@ data.mc.unique <- as.vector(unique(india.data$subid)) #length = 229 unique subid
 ## Note: Ages were calculated from a private full roster that has both testing date and DOB. 
 ## Note: Exact DOT not known, calculated as the average of dates that experimenters were testing
 ## Note: This roster contains only a subset of children; others were tested on other studies
-india.roster <- read.csv("Data/Raw data/Study1/india_mc_roster.csv", na.strings=c(""," ","NA", "NA ", "#VALUE!"))
+india.roster <- read.csv(here::here("Data/Raw data/Study1/india_mc_roster.csv"))
 
 #clean india roster to remove NAs and obviously incorrect ages
 india.roster %<>%
+  mutate(age = ifelse(age == "#VALUE!", NA, as.numeric(as.character(age))))%>%
   filter(!is.na(age), 
          age < 50)
 
@@ -334,14 +337,11 @@ all.data %<>%
          
 
 #save and export
-save(all.data, file="Data/Cleaned data/Study1_MC_all_data.RData")
-
-write.csv(all.data, file="Data/Cleaned data/Study1_MC_all_data.csv")
+write.csv(all.data, here::here("Data/Cleaned data/Study1_MC_all_data.csv"))
 
 # Study 2 ----
 #read in data 
-iran.study.2 <- read.csv("Data/Raw data/Study2/iran_study2_data.csv",
-                         na.strings = c("", " ", "NA ", "NA", "#VALUE!"))
+iran.study.2 <- read.csv(here::here("Data/Raw data/Study2/iran_study2_data.csv"))
 
 # some minor renaming and changes
 iran.study.2 %<>%
@@ -372,9 +372,7 @@ iran.study.2 %<>%
                                                                          ifelse(q_kind == 7, "Illegal", "Zesht")))))))))
 
 #save and export
-save(iran.study.2, file="Data/Cleaned data/Study2_MC_iran.RData")
- 
-write.csv(iran.study.2, file="Data/Cleaned data/Study2_MC_iran.csv")
+write.csv(iran.study.2, here::here("Data/Cleaned data/Study2_MC_iran.csv"))
 
 ##for sanity check
 tmp <- all.data %>%
@@ -384,6 +382,6 @@ tmp <- all.data %>%
 s1_distinct <- all.data %>%
   distinct(subid, site)
 
-write.csv(s1_distinct, file = "Data/sanity check/distinct_subs.csv")
+write.csv(s1_distinct, here::here("Data/sanity check/distinct_subs.csv"))
 
 
