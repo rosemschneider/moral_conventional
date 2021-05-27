@@ -1,0 +1,761 @@
+---
+title: "Moral conventional: Study 1"
+author: "Rose M. Schneider"
+date: "3/3/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+source(here::here("Analyses/0-clean.R")) 
+
+# Load cleaned data - 2 dfs
+rm(list = ls())
+study1_data <- read.csv(here::here("Data/Cleaned data/Study1_MC_all_data.csv"))#study 1
+study2_data <- read.csv(here::here("Data/Cleaned data/Study2_MC_iran.csv")) #study 2
+
+## Libraries
+library(tidyverse)
+library(magrittr)
+library(car)
+library(lme4)
+library(ggpubr)
+library(broom)
+library(broom.mixed)
+library(lmerTest)
+
+## Leftover data manipulations
+# leftover data manipulations
+study1_data %<>%
+  mutate(subid = factor(subid), 
+         task = factor(task), 
+         item = factor(item), 
+         answer = as.numeric(answer), 
+         site = factor(site), 
+         age.c = as.vector(scale(age, center = TRUE, scale = TRUE)), 
+         age.group = as.numeric(as.character(age.group)))%>%
+  mutate(age.bin = ifelse(age.group < 7, "5-6", 
+                          ifelse((age.group >= 7 & age.group < 9), "7-8", "9-10")), 
+          sex = ifelse(sex == "Female", "F",
+                      ifelse(sex == "Male", "M", 
+                             ifelse(sex == "", NA, as.character(sex)))))
+
+#global theme set
+theme_set(theme_bw(base_size = 13) + theme(text = element_text(size=13), 
+                             axis.title=element_text(size=12),
+                             strip.text = element_text(margin=margin(2,0,2,0)), 
+                             panel.grid = element_blank()))
+```
+
+# Study 1
+
+## Participants
+### Overall age demographics
+```{r}
+study1_data %>%
+  distinct(subid, site, age)%>%
+  group_by(site)%>%
+  summarise_at('age', 
+               list(~mean(., na.rm=T), 
+                    ~sd(., na.rm=T),
+                    ~median(., na.rm=T),
+                    ~min(., na.rm=T),
+                    ~max(., na.rm=T),
+                    ~sum(!is.na(.))))%>%
+  dplyr::rename("n" = "sum")%>%
+  dplyr::select(site, n, mean, sd, median, min, max)%>%
+  mutate(total.n = sum(n))%>%
+  knitr::kable()
+```
+
+### Age bin and sex counts
+```{r}
+study1_data %>%
+  distinct(subid, site, age.bin, sex)%>%
+  group_by(site, age.bin, sex)%>%
+  summarise(n = n())%>%
+  group_by(site)%>%
+  mutate(total.site.n = sum(n))%>%
+  knitr::kable()
+
+study1_data %>%
+  distinct(subid, site, sex)%>%
+  group_by(site, sex)%>%
+  summarise(n = n())%>%
+  group_by(site)%>%
+  mutate(total.site.n = sum(n))%>%
+  knitr::kable()
+```
+
+## Ratings for moral and conventional items by testing site
+### Descriptives
+```{r}
+study1_data %>%
+  filter(q_kind == 0)%>%
+  group_by(site, task)%>%
+  summarise_at('answer', 
+               list(~mean(., na.rm=T), 
+                    ~sd(., na.rm=T),
+                    ~median(., na.rm=T),
+                    ~min(., na.rm=T),
+                    ~max(., na.rm=T),
+                    ~sum(!is.na(.))))%>%
+  dplyr::rename("n" = "sum")%>%
+  dplyr::select(site, task, n, mean, sd, median, min, max)%>%
+  knitr::kable()
+
+study1_data %>%
+  filter(q_kind == 0)%>%
+  group_by(site, item)%>%
+  summarise_at('answer', 
+               list(~mean(., na.rm=T), 
+                    ~sd(., na.rm=T),
+                    ~median(., na.rm=T),
+                    ~min(., na.rm=T),
+                    ~max(., na.rm=T),
+                    ~sum(!is.na(.))))%>%
+  dplyr::rename("n" = "sum")%>%
+  dplyr::select(site, item, n, mean, sd, median, min, max)%>%
+  knitr::kable()
+  
+```
+
+### Visualization of mean rating (all items collapsed) by site
+```{r dev = "png"}
+study1_data %>% 
+  filter(q_kind == 0)%>%
+  mutate(task = factor(task, levels = c("moral", "conv"), 
+                       labels = c("Moral", "Conventional")))%>%
+  ggplot(aes(x = task, y = answer, fill = task, color = task)) + 
+  stat_summary(fun = mean, position = position_dodge(width = .9),
+               geom="bar", alpha = .5, colour = "black") +
+  geom_point(position=position_jitter(width = .18, height = .1),
+             size=1.5,
+             alpha = .6,
+             show.legend=FALSE,
+             inherit.aes = TRUE) +
+  geom_hline(yintercept = 3.5, color = "grey", linetype = "dashed") + 
+  facet_grid(~site) + 
+  coord_cartesian(ylim = c(1, 6)) +
+  stat_summary(fun.data = "mean_cl_boot", geom="linerange", 
+               position = position_dodge(width=0.9), size = 1, color = "black") +
+  theme(legend.position = "top", 
+        axis.text.x = element_blank(), 
+        axis.ticks.x = element_blank(), 
+        legend.key.size = unit(.5, 'cm'), 
+        legend.text = element_text(size = 10), 
+        legend.title = element_text(size = 11), 
+        legend.margin=margin(t = 0, unit='cm')) +
+  langcog::scale_color_solarized() + 
+  langcog::scale_fill_solarized() + 
+  labs(y = "Mean rating", 
+       x = "", 
+       fill = "Transgression") + 
+  scale_y_continuous(breaks = seq(1,6, 1))
+```
+
+### Visualization of ratings by age by site 
+```{r}
+study1_data %>%
+  filter(q_kind == 0)%>%
+  dplyr::rename("Transgression" = "task")%>%
+  mutate(Transgression = factor(Transgression, levels = c("moral", "conv"), 
+                                labels = c("Moral", "Conventional")))%>%
+  ggplot(aes(x = age, y= answer, color = Transgression, fill = Transgression)) + 
+  geom_point(position = position_jitter(width = .1, height = .05), 
+             alpha = .4) + 
+  geom_smooth(method ="lm") +
+  langcog::scale_color_solarized() + 
+  langcog::scale_fill_solarized() + 
+  labs(x = "Age", 
+       y = "Rating") + 
+  facet_grid(~site, scale = "free_x")
+```
+
+### Visualization of mean rating (by item) by site
+```{r}
+study1_data %>% 
+  filter(q_kind == 0)%>%
+  mutate(task = factor(task, levels = c("moral", "conv"), 
+                       labels = c("Moral", "Conventional")))%>%
+  ggplot(aes(x = task, y = answer, fill = item)) + 
+  stat_summary(fun = mean, position = position_dodge(width = .9),
+               geom="bar", colour = "black") +
+  stat_summary(fun.data = "mean_cl_boot", geom="linerange", 
+               position = position_dodge(width=0.9), size = 1, color = "black") +
+  geom_hline(yintercept = 3.5, color = "grey", linetype = "dashed") + 
+  facet_grid(~site) + 
+  theme(legend.position = "right", 
+        legend.key.size = unit(.5, 'cm'), 
+        legend.text = element_text(size = 8), 
+        legend.title = element_text(size = 9), 
+        legend.margin=margin(t = 0, unit='cm'), 
+        axis.text.x = element_text(hjust = 1, angle = 45)) +
+  langcog::scale_color_solarized() + 
+  langcog::scale_fill_solarized() + 
+  labs(y = "Mean rating", 
+       x = "", 
+       fill = "Situation")
+```
+
+
+### Analyses of differences in rating between moral and conventional transgressions: Within-country
+Pre-registered mixed-effects model: Rating ~ Transgression type (moral; conventional)*Age + (Transgression type|Subject) + (age|item).
+
+We will iteratively remove item slopes, then subject slopes, then will remove item effects altogether if necessary.
+
+#### High-level summary of these models: 
+In general, we find a significant difference between moral and conventional items for every country except Iran, even when we include the item random intercept to the model, with the following qualifiers: 
+
+1.  *The one exception* is Korea, where we *do not* find a significant difference when we include a random intercept of item to the model. This is because, while in general Korean children give higher ratings to conventional items, they give an extremely low rating to the "teachername" item. If you run the model without the item random intercept, there is a significant difference between moral and conventional items. 
+2.  For India: In general, there is a significant interaction between age and task, and this holds true with or without item random intercept. If we remove the item random intercept, there is a significant difference between moral and conventional items. 
+
+```{r, include = FALSE}
+# set up a df for ratings
+ratings.ms <- study1_data %>%
+  filter(q_kind == 0)%>%
+  mutate(task = factor(task, levels = c("moral", "conv")))
+
+#sanity check - every child should have two ratings
+ratings.check <-  ratings.ms %>%
+  group_by(subid)%>%
+  summarise(n = n())%>%
+  filter(n <2) #length = 0, so we're okay
+
+set.seed(1234) #set random seed for reproducibility
+```
+#### India
+##### Model: Answer ~ Task + Age + Task:Age + (1|subid) + (1|item)
+1.  Interaction between task and age significantly improves the fit of the model ($\chi^{2}$ = 7.68, *p* = .006)
+2.  No significant difference between moral and conventional items ($\beta$ = 0.28, *p* = .11)
+3.  No significant effect of age ($\beta$ = 0.02, *p* = .85)
+4.  Significant interaction between transgression type and age: as children age, they are more likely to give higher ratings for conventional transgressions in comparison to moral transgressions ($\beta$ = .30, *p* = .006)
+
+```{r, include = FALSE}
+### Final version of the model which converges
+ratings.india <- lmer(answer ~ task*age.c + (1|subid) + (1|item), 
+                      data = subset(ratings.ms, site == "India")) # this converges
+summary(ratings.india)
+
+### Next, with this model structure, test whether the interaction between age and task type improves the fit of the model
+## Is interaction justified for model with item random effect?
+ratings.india.base <- lmer(answer ~ task+age.c + (1|subid) + (1|item), 
+                      data = subset(ratings.ms, site == "India")) # this converges
+anova(ratings.india.base, ratings.india, test = 'lrt') # Yes, interaction improves the fit of the model
+```
+
+```{r}
+#summary of item model
+knitr::kable(summary(ratings.india)$coef)
+```
+
+#### Iran 
+##### Model: Answer ~ Task + Age + (task|subid) + (1|item)
+1.  Interaction between task and age does not significantly improve model fit ($\chi^{2}$ = 3.10, *p* = .08)
+2.  No significant difference between moral and conventional items ($\beta$ = 0.09, *p* = .41)
+3.  Significant effect of age, with increases in ratings as children age ($\beta$ = 0.14, *p* = .002)
+
+```{r, include = FALSE}
+### First, find the version of the model that converges
+ratings.iran <- lmer(answer ~ task*age.c + (task|subid) + (1|item), 
+                      data = subset(ratings.ms, site == "Iran")) # This converges
+summary(ratings.iran)
+
+### Second, test whether interaction significantly improves the fit of the model
+## testing to see if interaction is justified here
+ratings.iran.base <- lmer(answer ~ task+age.c + (task|subid) + (1|item), 
+                      data = subset(ratings.ms, site == "Iran")) # This converges
+anova(ratings.iran.base, ratings.iran, test = 'lrt') # does not improve model fit
+```
+
+```{r}
+## here are main effects from full model
+knitr::kable(summary(ratings.iran.base)$coef)
+```
+
+#### Canada
+##### Model: Answer ~ Task + Age + (1|subid) + (1|item)
+1.  Interaction between task and age does not significantly improve the fit of the model ($\chi^{2}$ = 2.87, *p* = .09)
+2.  Significant difference between moral and conventional items ($\beta$ = 0.50, *p* = .02)
+3.  Significant effect of age  ($\beta$ = 0.14, *p* = .02)
+```{r, include = FALSE}
+### First find version of model that works ###
+ratings.canada <- lmer(answer ~ task*age.c + (1|subid) + (1|item), 
+                     data = subset(ratings.ms, site == "Canada")) # this converges
+
+### Second, test whether interaction improves the fit of the model###
+## testing whether the interaction significantly improves the fit of the model 
+ratings.canada.base <- lmer(answer ~ task+age.c + (1|subid) + (1|item), 
+                     data = subset(ratings.ms, site == "Canada"))
+anova(ratings.canada.base, ratings.canada, test = 'lrt') # Does not improve, so we should drop it
+```
+
+```{r}
+## Summary of main effects 
+knitr::kable(summary(ratings.canada.base)$coef)
+```
+
+
+#### Korea
+**NB** with Korea dataset: When we include the item random effect, we find that there is **no** difference between moral and conventional items. This means that the variance in the intercepts associated with these items that there is reason to call into question whether there is an overall difference between these moral and conventional items. I confirmed that this is driven by the abnormally low ratings for the "teachername" item. If you remove this item and run the model, you find that the difference between moral and conventional is significant.
+
+##### Model: Answer ~ Task + Age + (1|subid) + (1|item)
+1.  The task x age interaction does not significantly improve the fit of the model ($\chi^{2}$ = 0.71, *p* = .40)
+2.  No significant difference between moral and conventional items ($\beta$ = 0.34, *p* = .25)
+3.  Marginal effect of age, with increases in ratings as children age ($\beta$ = 0.20, *p* = .06)
+
+```{r, include = FALSE}
+### First, find the version of the model that works ###
+ratings.korea <- lmer(answer ~ task*age.c + (1|subid) + (1|item),
+                       data = subset(ratings.ms, site == "Korea")) # this converges
+summary(ratings.korea)
+
+### Second, does the interaction imrpove the fit of the model? ###
+# Does interaction improve the fit of the model?
+ratings.korea.base <- lmer(answer ~ task+age.c + (1|subid) + (1|item),
+                       data = subset(ratings.ms, site == "Korea"))
+anova(ratings.korea.base, ratings.korea, test = 'lrt') # does not improve model fit
+
+### without item-level random effect
+ratings.korea.noitem <- lmer(answer ~ task+age.c + (1|subid),
+                       data = subset(ratings.ms, site == "Korea")) # this converges
+summary(ratings.korea.noitem)
+```
+
+Summary of main effects with item random effect
+```{r}
+#summary of main effects
+knitr::kable(summary(ratings.korea.base)$coef)
+
+```
+
+Summary of main effects without item-level random effect
+```{r}
+knitr::kable(summary(ratings.korea.noitem)$coef)
+```
+
+=====
+
+
+## Judgments of transgression acceptability under certain circumstances 
+### Descriptives 
+```{r}
+study1_data %>%
+  filter(q_kind != 0)%>%
+  group_by(site, task, q_kind_label)%>%
+  summarise_at('answer', 
+               list(~mean(., na.rm=T), 
+                    ~sd(., na.rm=T),
+                    ~sum(!is.na(.))))%>%
+  dplyr::rename("n" = "sum")%>%
+  dplyr::select(site, task, q_kind_label, n, mean, sd)%>%
+  knitr::kable()
+```
+
+### Visualization of acceptability (all items collapsed) by site
+```{r dev = 'png'}
+study1_data %>%
+  filter(q_kind != 0)%>%
+  mutate(task = factor(task, levels = c("moral", "conv"), 
+                       labels = c("Moral", "Conventional")), 
+         q_kind_label = factor(q_kind_label, labels = c("If everyone else did it?", 
+                                                        "In a faraway country?", 
+                                                        "If there's a school rule?")))%>%
+  ggplot(aes(x = site, y = answer, fill = task, color = task)) + 
+  stat_summary(fun = mean, position = position_dodge(width = .9),
+               geom="bar", colour = "black") + 
+  geom_hline(yintercept = .5, color = "grey", linetype = "dashed") + 
+  facet_grid(~q_kind_label) + 
+  stat_summary(fun.data = "mean_cl_boot", geom="linerange", 
+               position = position_dodge(width=0.9), size = 1, color = "black") +
+  # scale_fill_brewer(palette = "Dark2") +
+  langcog::scale_fill_solarized()+
+  labs(y = "Mean acceptability rating", 
+       x = "Site", 
+       fill = "Transgression")  +
+  theme(axis.text.x = element_text(hjust = 1, angle = 45), 
+        legend.key.size = unit(.5, 'cm'), 
+        legend.text = element_text(size = 10), 
+        legend.title = element_text(size = 11), 
+        legend.margin=margin(t = 0, unit='cm'), 
+        plot.title = element_text(size = 12)) +
+  guides(fill = guide_legend(title.position = "top")) +
+  scale_y_continuous(breaks = seq(0, 1,.25)) + 
+  ggtitle("Would it be okay...")
+ggsave("mean_acceptability.png", height = 3)
+```
+
+
+### Analysis of acceptability ratings by transgression type: Within-country
+Pre-registration: Response (yes/no) ~ Transgression type (moral; conventional) *Age + (transgression type|subject) +(age|item). Once again we will begin with a maximal random effects structure, and iteratively remove coefficients until the model converges. We will begin first by removing the slope of the item effect, then of subject, and if necessary removing the item effect altogether.
+
+```{r, include = FALSE}
+# set up a data frame
+acceptability.ms <- study1_data %>%
+  filter(q_kind != 0)%>%
+  mutate(task = factor(task, levels = c("moral", "conv")))
+```
+
+#### India
+**High level summary** 
+For the most part, there is no significant difference between moral and conventional items for acceptability EXCEPT in the situation where "everyone else was doing it." In that case, there is a difference between moral and conventional items when you do NOT include the item random effect in the model.
+
+##### If everyone else were doing it: Answer ~ Task + Age + (1|subid) + (1|item)
+1.  Interaction between task and age not significant, so dropped from the model ($\chi^{2}$ = 0.19, *p* = 0.66)
+2.  No significant difference in acceptability between moral and conventional ($\beta$ = 1.11, *p* = .09)
+3.  No significant effect of age ($\beta$ = -0.15, *p* = 0.82)
+```{r, include = FALSE}
+everyone.india <- glmer(answer ~ task*age.c + (1|subid) + (1|item),
+                    data = subset(acceptability.ms, q_kind == 3 & site == "India"),
+                    family = 'binomial') # converges
+
+## is the interaction between age and task significant?
+everyone.india.base <- glmer(answer ~ task+age.c + (1|subid) + (1|item), 
+                    data = subset(acceptability.ms, q_kind == 3 & site == "India"), 
+                    family = 'binomial') # converges
+anova(everyone.india.base, everyone.india, test = 'lrt') ## the interaction does not significantly improve the fit, so we drop it from the model
+```
+
+```{r}
+##summary of main effects
+knitr::kable(summary(everyone.india.base)$coef)
+```
+
+##### Model without item random effect: If everyone else were doing it: Answer ~ Task + Age + (1|subid)
+1.  Interaction between task and age not significant, so dropped from the model ($\chi^{2}$ = 0.22, *p* = 0.64)
+2.  Significant difference in acceptability between moral and conventional ($\beta$ = 1.04, *p* = .001)
+3.  No significant effect of age ($\beta$ = -0.15, *p* = 0.81)
+```{r, include = FALSE}
+everyone.india.noitem <- glmer(answer ~ task*age.c + (1|subid),
+                    data = subset(acceptability.ms, q_kind == 3 & site == "India"),
+                    family = 'binomial') # converges
+
+## is the interaction between age and task significant?
+everyone.india.base.noitem <- glmer(answer ~ task+age.c + (1|subid), 
+                    data = subset(acceptability.ms, q_kind == 3 & site == "India"), 
+                    family = 'binomial') # converges
+anova(everyone.india.base.noitem, everyone.india.noitem, test = 'lrt') ## the interaction does not significantly improve the fit, so we drop it from the model
+```
+
+```{r}
+##summary of main effects
+knitr::kable(summary(everyone.india.base.noitem)$coef)
+```
+
+##### Far-away country: Answer ~ task + age + (1|subid)
+**Note** model with random item effect does not converge, so this is our only model
+
+1.  Interaction between task and age not significant ($\chi^{2}$ = 0.56, *p* = 0.46)
+2.  No significant difference between tasks ($\beta$ = -.26, *p* = .45)
+3.  No significant effect of age ($\beta$ = -0.60, *p* = .07)
+````{r, include = FALSE}
+### Far away country
+faraway.india <- glmer(answer ~ task*age.c + (1|subid),
+                       data = subset(acceptability.ms, q_kind == 1 & site == "India"),
+                       family = 'binomial') # converges
+## is the interaction significant? 
+faraway.india.base <- glmer(answer ~ task + age.c + (1|subid), 
+                       data = subset(acceptability.ms, q_kind == 1 & site == "India"), 
+                       family = 'binomial') # converges
+anova(faraway.india.base, faraway.india, test = 'lrt') ##interaction does not improve the fit of the model; drop it
+```
+
+```{r}
+##Main effects
+knitr::kable(summary(faraway.india.base)$coef)
+```
+
+##### Rule at school: Answer ~ Task + Age + (1|subid) + (1|item)
+1.  No significant interaction between task and age ($\chi^{2}$ = 0.02, *p* = 0.89)
+2.  No significant differences between tasks ($\beta$ = 0.40, *p* = .21)
+3.  No significant effect of age ($\beta$ = 0.15, *p* = .80)
+```{r, include = FALSE}
+rule.india <- glmer(answer ~ task*age.c + (1|subid) + (1|item), 
+                       data = subset(acceptability.ms, q_kind == 2 & site == "India"), 
+                       family = 'binomial') # converges
+##does the interaction improve the model fit?
+rule.india.base <- glmer(answer ~ task+ age.c + (1|subid) + (1|item), 
+                       data = subset(acceptability.ms, q_kind == 2 & site == "India"), 
+                       family = 'binomial') # converges
+anova(rule.india.base, rule.india, test = 'lrt') #does not improve model fit
+```
+
+```{r}
+#Main effects
+knitr::kable(summary(rule.india.base)$coef)
+```
+
+
+----
+
+#### Iran
+**High level summary** 
+No significant effects of task EXCEPT for the "far away country" scenario, where children judge conventional items more acceptable in the model WITHOUT the item random effect.
+
+#### If everyone else were doing it: Answer ~ Task + Age + (1|subid)
+**Note** The model with the item random effect does not converge, so this is our only model
+
+1.  Interaction between task and age not significant, so dropped from the model ($\chi^{2}$ = 0.08, *p* = 0.77)
+2.  No significant difference in acceptability between moral and conventional ($\beta$ = 1.03, *p* = .06)
+3.  No significant effect of age ($\beta$ = 0.61, *p* = 0.42)
+```{r, include = FALSE}
+everyone.iran <- glmer(answer ~ task*age.c + (1|subid),
+                    data = subset(acceptability.ms, q_kind == 3 & site == "Iran"),
+                    family = 'binomial') # converges
+
+## is the interaction between age and task significant?
+everyone.iran.base <- glmer(answer ~ task+age.c + (1|subid), 
+                    data = subset(acceptability.ms, q_kind == 3 & site == "Iran"), 
+                    family = 'binomial') # converges
+anova(everyone.iran.base, everyone.iran, test = 'lrt') ## the interaction does not significantly improve the fit, so we drop it from the model
+```
+
+```{r}
+##summary of main effects
+knitr::kable(summary(everyone.iran.base)$coef)
+```
+
+##### Far-away country: Answer ~ task + age + (1|subid) + (1|item)
+1.  Interaction between task and age not significant ($\chi^{2}$ = 0.0007, *p* = 0.98)
+2.  No significant difference between tasks ($\beta$ = 2.74, *p* = .05)
+3.  No significant effect of age ($\beta$ = 0.60, *p* = .49)
+````{r, include = FALSE}
+### Far away country
+faraway.iran <- glmer(answer ~ task*age.c + (1|subid) + (1|item),
+                      data = subset(acceptability.ms, q_kind == 1 & site == "Iran"),
+                      family = 'binomial') # converges
+## is the interaction significant? 
+faraway.iran.base <- glmer(answer ~ task + age.c + (1|subid) + (1|item), 
+                       data = subset(acceptability.ms, q_kind == 1 & site == "Iran"), 
+                       family = 'binomial') # converges
+anova(faraway.iran.base, faraway.iran, test = 'lrt') ##interaction does not improve the fit of the model; drop it
+```
+
+```{r}
+##Main effects
+knitr::kable(summary(faraway.iran.base)$coef)
+```
+
+
+
+##### Rule at school: Answer ~ Task + Age + (1|subid) + (1|item)
+1.  Significant interaction between task and age ($\chi^{2}$ = 4.12, *p* = 0.04)
+2.  No significant differences between tasks ($\beta$ = 0.56, *p* = .43)
+3.  No significant effect of age ($\beta$ = -0.61, *p* = .43)
+4.  No significant interaction between age and task ($\beta$ = -0.44, *p* = .42)
+```{r, include = FALSE}
+rule.iran <- glmer(answer ~ task*age.c + (1|subid), 
+                       data = subset(acceptability.ms, q_kind == 2 & site == "Iran"), 
+                       family = 'binomial') # converges
+##does the interaction improve the model fit?
+rule.iran.base <- glmer(answer ~ task+ age.c + (1|subid), 
+                       data = subset(acceptability.ms, q_kind == 2 & site == "Iran"), 
+                       family = 'binomial') # converges
+anova(rule.iran.base, rule.iran, test = 'lrt') #does not improve model fit
+```
+
+```{r}
+#Main effects
+knitr::kable(summary(rule.iran)$coef)
+```
+
+##### Model without item random effect: Rule at school: Answer ~ Task + Age + (1|subid)
+1.  No significant interaction between task and age ($\chi^{2}$ = 0.67, *p* = 0.41)
+2.  No significant differences between tasks ($\beta$ = 0.64, *p* = .15)
+3.  No significant effect of age ($\beta$ = 0.30, *p* = .64)
+```{r, include = FALSE}
+rule.iran.noitem <- glmer(answer ~ task*age.c + (1|subid), 
+                       data = subset(acceptability.ms, q_kind == 2 & site == "Iran"), 
+                       family = 'binomial') # converges
+##does the interaction improve the model fit?
+rule.iran.base.noitem <- glmer(answer ~ task+ age.c + (1|subid), 
+                       data = subset(acceptability.ms, q_kind == 2 & site == "Iran"), 
+                       family = 'binomial') # converges
+anova(rule.iran.base.noitem, rule.iran.noitem, test = 'lrt') #does not improve model fit
+```
+
+```{r}
+#Main effects
+knitr::kable(summary(rule.iran.base.noitem)$coef)
+```
+
+-----
+
+#### Canada
+**High level summary**
+There is a significant difference between moral and conventional items for every scenario, regardless of whether we include the item random effect or not. 
+
+##### If everyone else were doing it: Answer ~ Task + Age + (1|subid) + (1|item)
+1.  Interaction between task and age not significant, so dropped from the model ($\chi^{2}$ = 0.62, *p* = 0.43)
+2.  Significant difference in acceptability between moral and conventional ($\beta$ = 1.42, *p* = .02)
+3.  No significant effect of age ($\beta$ = 0.80, *p* = 0.07)
+```{r, include = FALSE}
+everyone.canada <- glmer(answer ~ task*age.c + (1|subid) + (1|item),
+                    data = subset(acceptability.ms, q_kind == 3 & site == "Canada"),
+                    family = 'binomial') # converges
+
+## is the interaction between age and task significant?
+everyone.canada.base <- glmer(answer ~ task+age.c + (1|subid) + (1|item), 
+                    data = subset(acceptability.ms, q_kind == 3 & site == "Canada"), 
+                    family = 'binomial') # converges
+anova(everyone.canada.base, everyone.canada, test = 'lrt') ## the interaction does not significantly improve the fit, so we drop it from the model
+```
+
+```{r}
+##summary of main effects
+knitr::kable(summary(everyone.canada.base)$coef)
+```
+
+##### Far-away country: Answer ~ task + age + (1|subid) + (1|item)
+1.  Interaction between task and age not significant ($\chi^{2}$ = 1.20, *p* = .27)
+2.  Significant difference between tasks ($\beta$ = 1.50, *p* = .02)
+3.  No significant effect of age ($\beta$ = -.24, *p* = .45)
+````{r, include = FALSE}
+## Far away country
+faraway.canada <- glmer(answer ~ task*age.c + (1|subid) + (1|item),
+                      data = subset(acceptability.ms, q_kind == 1 & site == "Canada"),
+                      family = 'binomial') # singular fit
+## is the interaction significant? 
+faraway.canada.base <- glmer(answer ~ task + age.c + (1|subid) + (1|item), 
+                       data = subset(acceptability.ms, q_kind == 1 & site == "Canada"), 
+                       family = 'binomial') # converges
+anova(faraway.canada.base, faraway.canada, test = 'lrt') ##interaction does improve the fit of the model
+```
+
+```{r}
+##summary of main effects
+knitr::kable(summary(faraway.canada.base)$coef)
+```
+
+##### Rule at school: Answer ~ Task + Age + (1|subid) + (1|item)
+1.  No significant interaction between task and age ($\chi^{2}$ = 2.77, *p* = 0.10)
+2.  Significant differences between tasks ($\beta$ = 1.53, *p* = .03)
+3.  Significant effect of age ($\beta$ = -1.01, *p* = .02)
+```{r, include = FALSE}
+rule.canada <- glmer(answer ~ task*age.c + (1|subid) + (1|item), 
+                       data = subset(acceptability.ms, q_kind == 2 & site == "Canada"), 
+                       family = 'binomial') # converges
+##does the interaction improve the model fit?
+rule.canada.base <- glmer(answer ~ task+ age.c + (1|subid) + (1|item), 
+                       data = subset(acceptability.ms, q_kind == 2 & site == "Canada"), 
+                       family = 'binomial') # converges
+anova(rule.canada.base, rule.canada, test = 'lrt') #does not improve model fit
+```
+
+```{r}
+#Main effects
+knitr::kable(summary(rule.canada.base)$coef)
+```
+
+----
+
+#### Korea
+**High level summary**
+Some significant differences between tasks: 
+1.  In the "everyone else is doing it" regardless of whether model includes item random effect
+2.  In the "rule at school" ONLY in the model without the item random effect.
+##### If everyone else were doing it: Answer ~ Task + Age + (1|subid) + (1|item)
+1.  Interaction between task and age not significant, so dropped from the model ($\chi^{2}$ = 0.83, *p* = 0.36)
+2.  Significant difference in acceptability between moral and conventional ($\beta$ = 1.73, *p* = .006)
+3.  Significant effect of age ($\beta$ = 1.77, *p* = 0.01)
+```{r, include = FALSE}
+everyone.korea <- glmer(answer ~ task*age.c + (1|subid) + (1|item),
+                    data = subset(acceptability.ms, q_kind == 3 & site == "Korea"),
+                    family = 'binomial') # converges
+
+## is the interaction between age and task significant?
+everyone.korea.base <- glmer(answer ~ task+age.c + (1|subid) + (1|item), 
+                    data = subset(acceptability.ms, q_kind == 3 & site == "Korea"), 
+                    family = 'binomial') # converges
+anova(everyone.korea.base, everyone.korea, test = 'lrt') ## the interaction does not significantly improve the fit, so we drop it from the model
+```
+
+```{r}
+##summary of main effects
+knitr::kable(summary(everyone.korea.base)$coef)
+```
+
+##### Far-away country: Answer ~ task + age + (1|subid) + (1|item)
+1.  Interaction between task and age not significant ($\chi^{2}$ = 1.77, *p* = 0.20)
+2.  No significant difference between tasks ($\beta$ = -1.12, *p* = .39)
+3.  No significant effect of age ($\beta$ = -0.23, *p* = .77)
+````{r, include = FALSE}
+### Far away country
+faraway.korea <- glmer(answer ~ task*age.c + (1|subid) + (1|item),
+                      data = subset(acceptability.ms, q_kind == 1 & site == "Korea"),
+                      family = 'binomial') # fails to converge
+
+faraway.korea.base <- glmer(answer ~ task + age.c + (1|subid) + (1|item), 
+                       data = subset(acceptability.ms, q_kind == 1 & site == "Korea"), 
+                       family = 'binomial') # converges
+anova(faraway.korea.base, faraway.korea, test = 'lrt') ##interaction does not improve the fit of the model; drop it
+```
+
+```{r}
+##Main effects
+knitr::kable(summary(faraway.korea.base)$coef)
+```
+
+##### Rule at school: Answer ~ Task + Age + (1|subid) + (1|item)
+1.  No significant interaction between task and age ($\chi^{2}$ = 2.69, *p* = 0.10)
+2.  No significant differences between tasks ($\beta$ = 1.50, *p* = .11)
+3.  Marginal significant effect of age ($\beta$ = 1.95, *p* = .049)
+
+```{r, include = FALSE}
+rule.korea<- glmer(answer ~ task*age.c + (1|subid) + (1|item), 
+                       data = subset(acceptability.ms, q_kind == 2 & site == "Korea"), 
+                       family = 'binomial') # converges
+##does the interaction improve the model fit?
+rule.korea.base <- glmer(answer ~ task+ age.c + (1|subid) + (1|item), 
+                       data = subset(acceptability.ms, q_kind == 2 & site == "Korea"), 
+                       family = 'binomial') # converges
+anova(rule.korea.base, rule.korea, test = 'lrt') #does not improve model fit
+```
+
+```{r}
+##Main effects
+knitr::kable(summary(rule.korea.base)$coef)
+```
+
+====
+
+### Differences in ratings across cultures: Answer ~ Site x Task x Age + (1|subid)
+```{r, include = FALSE}
+ratings.ms <- ratings.ms %>%
+  mutate(site = factor(site, levels = c("Canada", "India", "Iran", "Korea")))
+
+omnibus.base <- lmer(answer ~ task + age.c + (1|subid) + (task|site) + (1|item), 
+                data = ratings.ms, 
+                control=lmerControl(optimizer="bobyqa",
+                                             optCtrl=list(maxfun=2e4)))
+omnibus.site <- lmer(answer ~ site + task + age.c + (1|subid) + (1|site), 
+                data = ratings.ms, 
+                control=lmerControl(optimizer="bobyqa",
+                                             optCtrl=list(maxfun=2e4)))
+anova(omnibus.base, omnibus.site, test = 'lrt') ## significant effect of site
+
+##testing for lower-order interaction
+omnibus.taskageint <- lmer(answer ~ site + task*age.c +  (1|subid), 
+                data = ratings.ms, 
+                control=lmerControl(optimizer="bobyqa",
+                                             optCtrl=list(maxfun=2e4)))
+anova(omnibus.site, omnibus.taskageint)
+
+omnibus <- lmer(answer ~ site * task * age.c + (1|subid), 
+                data = ratings.ms, 
+                control=lmerControl(optimizer="bobyqa",
+                                             optCtrl=list(maxfun=2e4)))
+
+##testing for full 3 way
+anova(omnibus.taskageint, omnibus) ## three way interaction
+summary(omnibus)
+anova(omnibus)
+
+library(lsmeans)
+
+emmeans(omnibus, pairwise~site*task, by = "age.c")
+```
+
+```{r}
+emmeans::emmeans(omnibus, pairwise ~ site | task | age.c)
+```

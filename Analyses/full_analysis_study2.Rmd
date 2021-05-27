@@ -1,0 +1,548 @@
+---
+title: "full_analysis_study2"
+author: "Rose M. Schneider"
+date: "4/8/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+source(here::here("Analyses/0-clean.R")) 
+
+# Load cleaned data - 2 dfs
+## TODO clean up the csv
+rm(list = ls())
+study2_data <- read.csv(here::here("Data/Cleaned data/Study2_MC_iran.csv"))%>% 
+  mutate(item = ifelse(item == "toys ", "toys", as.character(item)), 
+         item = ifelse(task_num == "conv4.8", "toys", as.character(item)), 
+         item = ifelse(task_num == "reigious1.8", "push", as.character(item)), 
+         task = ifelse(item == "push", "moral", as.character(task)), 
+         q_kind_label = ifelse(q_kind_label == "Farawary country", "Faraway country", 
+                               ifelse(q_kind_label == "Non-muslim", "Non-Muslim", as.character(q_kind_label))))#study 2
+
+## Libraries
+library(tidyverse)
+library(magrittr)
+library(car)
+library(lme4)
+library(ggpubr)
+library(broom)
+library(broom.mixed)
+library(lmerTest)
+
+## Leftover data manipulations
+# leftover data manipulations
+study2_data %<>%
+  mutate(subid = factor(subid), 
+         task = factor(task), 
+         item = factor(item), 
+         answer = as.numeric(answer), 
+         site = factor(site), 
+         age.c = as.vector(scale(age, center = TRUE, scale = TRUE)), 
+         age.group = as.numeric(as.character(age.group)))%>%
+  mutate(age.bin = ifelse(age.group < 7, "5-6", 
+                          ifelse((age.group >= 7 & age.group < 9), "7-8", "9-10")))
+
+#global theme set
+theme_set(theme_bw() + theme(text = element_text(size=13), 
+                             axis.title=element_text(size=12),
+                             strip.text = element_text(margin=margin(2,0,2,0)), 
+                             panel.grid = element_blank()))
+```
+
+# Study 2
+
+## Participants
+### Overall age demographics
+```{r}
+study2_data %>%
+  distinct(subid, age)%>%
+  summarise_at('age', 
+               list(~mean(., na.rm=T), 
+                    ~sd(., na.rm=T),
+                    ~median(., na.rm=T),
+                    ~min(., na.rm=T),
+                    ~max(., na.rm=T),
+                    ~sum(!is.na(.))))%>%
+  dplyr::rename("n" = "sum")%>%
+  dplyr::select(n, mean, sd, median, min, max)%>%
+  knitr::kable()
+```
+
+### Age bin and sex counts
+```{r}
+study2_data %>%
+  distinct(subid, sex)%>%
+  group_by(sex)%>%
+  summarise(n = n())%>%
+  mutate(total.site.n = sum(n))%>%
+  knitr::kable()
+```
+
+## Ratings for moral, conventional, conventional-Iran, and religious items
+### Descriptives
+```{r}
+study2_data %>%
+  filter(q_kind == 0)%>%
+  group_by(task)%>%
+  summarise_at('answer', 
+               list(~mean(., na.rm=T), 
+                    ~sd(., na.rm=T),
+                    ~median(., na.rm=T),
+                    ~min(., na.rm=T),
+                    ~max(., na.rm=T),
+                    ~sum(!is.na(.))))%>%
+  dplyr::rename("n" = "sum")%>%
+  dplyr::select(task, n, mean, sd, median, min, max)%>%
+  knitr::kable()
+```
+
+### Visualization of mean rating (all items collapsed) by site
+```{r}
+study2_data %>% 
+  filter(q_kind == 0)%>%
+  mutate(task = factor(task, levels = c("moral", "conv", "conv.iran", "religious"), 
+                       labels = c("Moral", "Conventional", "Conventional-Iran", "Religious")))%>%
+  ggplot(aes(x = task, y = answer, fill = task, color = task)) + 
+  stat_summary(fun = mean, position = position_dodge(width = .9),
+               geom="bar", alpha = .5, colour = "black") +
+  geom_point(position=position_jitter(width = .18, height = .1),
+             size=1.5,
+             alpha = .6,
+             show.legend=FALSE,
+             inherit.aes = TRUE) +
+  geom_hline(yintercept = 3.5, color = "grey", linetype = "dashed") + 
+  coord_cartesian(ylim = c(1, 6)) +
+  stat_summary(fun.data = "mean_cl_boot", geom="linerange", 
+               position = position_dodge(width=0.9), size = 1, color = "black") +
+  theme(legend.position = "none", 
+        # axis.text.x = element_blank(), 
+        axis.ticks.x = element_blank(), 
+        legend.key.size = unit(.5, 'cm'), 
+        legend.text = element_text(size = 10), 
+        legend.title = element_text(size = 11), 
+        legend.margin=margin(t = 0, unit='cm')) +
+  langcog::scale_color_solarized() + 
+  langcog::scale_fill_solarized() + 
+  labs(y = "Mean rating", 
+       x = "Transgression Type") + 
+  scale_y_continuous(breaks = seq(1,6, 1))
+ggsave("study2_ratings.png", height = 3, width = 6)
+```
+
+### Visualization of ratings by age by task
+```{r}
+study2_data %>%
+  filter(q_kind == 0)%>%
+  dplyr::rename("Transgression" = "task")%>%
+  mutate(Transgression = factor(Transgression, levels = c("moral", "conv", "conv.iran", "religious"), 
+                       labels = c("Moral", "Conventional", "Conventional-Iran", "Religious")))%>%
+  ggplot(aes(x = age, y= answer, color = Transgression, fill = Transgression)) + 
+  geom_point(position = position_jitter(width = .1, height = .05), 
+             alpha = .4) + 
+  geom_smooth(method ="lm") +
+  langcog::scale_color_solarized() + 
+  langcog::scale_fill_solarized() + 
+  labs(x = "Age", 
+       y = "Rating")
+```
+
+### Visualization of mean rating (by item) by site
+```{r}
+study2_data %>% 
+  filter(q_kind == 0)%>%
+  mutate(task = factor(task, levels = c("moral", "conv", "conv.iran", "religious"), 
+                       labels = c("Moral", "Conventional", "Conventional-Iran", "Religious")))%>%
+  ggplot(aes(x = item, y = answer, fill =task)) + 
+  stat_summary(fun = mean, position = position_dodge(width = .9),
+               geom="bar", colour = "black") +
+  geom_hline(yintercept = 3.5, color = "grey", linetype = "dashed") + 
+  coord_cartesian(ylim = c(1, 6)) +
+  facet_grid(~task, scale = "free_x") +
+  stat_summary(fun.data = "mean_cl_boot", geom="linerange", 
+               position = position_dodge(width=0.9), size = 1, color = "black") +
+  theme(legend.position = "none", 
+        axis.text.x = element_text(hjust = 1, angle = 45),
+        axis.ticks.x = element_blank(), 
+        legend.key.size = unit(.5, 'cm'), 
+        legend.text = element_text(size = 10), 
+        legend.title = element_text(size = 11), 
+        legend.margin=margin(t = 0, unit='cm')) +
+  langcog::scale_color_solarized() + 
+  langcog::scale_fill_solarized() + 
+  labs(y = "Mean rating", 
+       x = "Situation") + 
+  scale_y_continuous(breaks = seq(1,6, 1))
+```
+
+### Analyses of differences in rating between moral and conventional transgressions: Within-country
+Pre-registered mixed-effects model: Rating ~ Transgression type (moral; conventional; conv.iran, religious)*Age + (Transgression type|Subject) + (age|item).
+
+We will iteratively remove item slopes, then subject slopes, then will remove item effects altogether if necessary.
+
+```{r, include = FALSE}
+# set up a df for ratings
+ratings.ms <- study2_data %>%
+  filter(q_kind == 0)%>%
+  mutate(task = factor(task, levels = c("moral", "conv", "conv.iran", "religious")))
+
+#sanity check - every child should have two ratings
+ratings.check <-  ratings.ms %>%
+  group_by(subid)%>%
+  summarise(n = n())%>%
+  filter(n <2) #length = 0, so we're okay
+
+set.seed(1234) #set random seed for reproducibility
+```
+
+### Model: Answer ~ Task + Age + (1|subid)
+**Note** Item model will not converge, so this is our only model
+1.  No significant interaction between age and task ($\chi^{2}$ = 5.33, *p* = 0.15)
+2.  No significant difference between MORAL and CONVENTIONAL items ($\beta$ = 0.04, *p* = .57)
+3.  Significant difference between MORAL and CONVENTIONAL IRAN items ($\beta$ = 0.44, *p* < .001)
+4.  No significant difference between MORAL and RELIGIOUS items ($\beta$ = 0.04, *p* = .57)
+5.  Significant effect of age ($\beta$ = 0.13, *p* = .01)
+
+```{r, include = FALSE}
+iran.rating <- lmer(answer ~ task*age.c + (1|subid), 
+                    data = ratings.ms)
+##test to see if interaction is significant
+iran.rating.base <- lmer(answer ~ task+age.c + (1|subid), 
+                    data = ratings.ms)
+anova(iran.rating.base, iran.rating, test = 'lrt')
+
+## get the chisq of the task & age
+iran.base.base <-  lmer(answer ~ task + (1|subid), 
+                    data = ratings.ms)
+anova(iran.base.base, iran.rating.base)
+```
+
+```{r}
+#summary of item model
+knitr::kable(summary(iran.rating.base)$coef)
+```
+
+=====
+## Judgments of transgression acceptability under certain circumstances 
+### Descriptives 
+```{r}
+study2_data %>%
+  filter(q_kind != 0)%>%
+  group_by(task, q_kind_label)%>%
+  summarise_at('answer', 
+               list(~mean(., na.rm=T), 
+                    ~sd(., na.rm=T),
+                    ~sum(!is.na(.))))%>%
+  dplyr::rename("n" = "sum")%>%
+  dplyr::select(task, q_kind_label, n, mean, sd)%>%
+  knitr::kable()
+```
+
+### Visualization of acceptability by task
+```{r}
+study2_data %>%
+  filter(q_kind != 0, 
+         q_kind_label != "Haram", 
+           q_kind_label != "Illegal",
+           q_kind_label != "Zesht")%>%
+  mutate(task = factor(task, levels = c("moral", "conv", "conv.iran", "religious"), 
+                       labels = c("Moral", "Conventional", "Conventional - Iran", "Religious")), 
+         q_kind_label = factor(q_kind_label, levels = c("Everyone else", "Faraway country", "Rule at school", "Foreigner", 
+                                                        "Non-Muslim")))%>%
+  ggplot(aes(x = task, y = answer, fill = task, color = task)) + 
+  stat_summary(fun = mean, position = position_dodge(width = .9),
+               geom="bar", colour = "black") +
+  geom_hline(yintercept = .5, color = "grey", linetype = "dashed") + 
+  stat_summary(fun.data = "mean_cl_boot", geom="linerange", 
+               position = position_dodge(width=0.9), size = 1, color = "black") +
+  facet_grid(~q_kind_label) +
+  theme(legend.position = "right", 
+        axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(), 
+        legend.key.size = unit(.5, 'cm'), 
+        legend.text = element_text(size = 10), 
+        legend.title = element_text(size = 11), 
+        legend.margin=margin(t = 0, unit='cm')) +
+  langcog::scale_color_solarized() + 
+  langcog::scale_fill_solarized() + 
+  labs(y = "Mean acceptability rating", 
+       x = "", 
+       fill = "Transgression") + 
+  ggtitle("Would it be okay...") +
+  scale_y_continuous(breaks = seq(0, .50, .25))
+ggsave("study2_acceptability_ratings_main.png", height = 3, width = 8.5)
+
+```
+
+### Visualization of illegal, haram, zesht
+```{r}
+study2_data %>%
+  filter(q_kind != 0, 
+         q_kind_label == "Haram" | 
+           q_kind_label == "Illegal" |
+           q_kind_label == "Zesht")%>%
+  mutate(task = factor(task, levels = c("moral", "conv", "conv.iran", "religious"), 
+                       labels = c("Moral", "Conventional", "Conventional - Iran", "Religious")))%>%
+  ggplot(aes(x = task, y = answer, fill = task, color = task)) + 
+  stat_summary(fun = mean, position = position_dodge(width = .9),
+               geom="bar", colour = "black") +
+  geom_hline(yintercept = .5, color = "grey", linetype = "dashed") + 
+  stat_summary(fun.data = "mean_cl_boot", geom="linerange", 
+               position = position_dodge(width=0.9), size = 1, color = "black") +
+  facet_grid(~q_kind_label) +
+  theme(legend.position = "right", 
+        axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(), 
+        legend.key.size = unit(.5, 'cm'), 
+        legend.text = element_text(size = 10), 
+        legend.title = element_text(size = 11), 
+        legend.margin=margin(t = 0, unit='cm')) +
+  langcog::scale_color_solarized() + 
+  langcog::scale_fill_solarized() + 
+  labs(y = "Mean rating", 
+       x = "", 
+       fill = "Transgression") + 
+  ggtitle("Is it...") +
+ggsave("study2_acceptability_ratings_supp.png", height = 3, width = 8.5)
+
+```
+
+### Analysis of acceptability ratings by transgression type: Within-country: 
+Pre-registration: Response (yes/no) ~ Transgression type (moral; conventional; conventional-Iran; religious) *Age + (transgression type|subject) +(age|item). Once again we will begin with a maximal random effects structure, and iteratively remove coefficients until the model converges. We will begin first by removing the slope of the item effect, then of subject, and if necessary removing the item effect altogether.
+
+
+```{r, include = FALSE}
+# set up a data frame
+acceptability.ms <- study2_data %>%
+  filter(q_kind != 0)%>%
+  mutate(task = factor(task, levels = c("moral", "conv", "conv.iran", "religious")))
+```
+
+#### If everyone else were doing it: Answer ~ Task + Age + (1|subid)
+**Note** Model will not converge with item random effect. 
+
+1.  Interaction between task and age not significant, so dropped from the model ($\chi^{2}$ = 6.14, *p* = 0.10)
+2.  Significant difference in acceptability between moral and conventional ($\beta$ = 1.26, *p* < .001)
+3.  Significant difference in acceptability between moral and conventional-Iran ($\beta$ = 1.84, *p* < .001)
+4.  No significant difference in acceptability between moral and religious ($\beta$ = .13, *p* = .70)
+5.  Significant effect of age ($\beta$ = 0.92, *p* < .001)
+```{r, include = FALSE}
+everyone <- glmer(answer ~ task*age.c + (1|subid),
+                    data = subset(acceptability.ms, q_kind == 3),
+                    family = 'binomial') # converges
+
+## is the interaction between age and task significant?
+everyone.base <- glmer(answer ~ task+age.c + (1|subid),
+                    data = subset(acceptability.ms, q_kind == 3), 
+                    family = 'binomial') # converges
+anova(everyone.base, everyone, test = 'lrt') ## the interaction does not significantly improve the fit, so we drop it from the model
+```
+
+```{r}
+##summary of main effects
+knitr::kable(summary(everyone.base)$coef)
+```
+
+#### Far away: Answer ~ Task + Age + (1|subid)
+**Note** Model will not converge with item random effect. 
+
+1.  Interaction between task and age not significant, so dropped from the model ($\chi^{2}$ = 4.00, *p* = 0.26)
+2.  Significant difference in acceptability between moral and conventional ($\beta$ = .69, *p* = .03)
+3.  Significant difference in acceptability between moral and conventional-Iran ($\beta$ = 1.51, *p* < .001)
+4.  Significant difference in acceptability between moral and religious ($\beta$ = 1.70, *p* < .001)
+5.  Significant effect of age ($\beta$ = 0.70, *p* = .002)
+```{r, include = FALSE}
+faraway <- glmer(answer ~ task*age.c + (1|subid),
+                    data = subset(acceptability.ms, q_kind == 1),
+                    family = 'binomial') # converges
+
+## is the interaction between age and task significant?
+faraway.base <- glmer(answer ~ task+age.c + (1|subid),
+                    data = subset(acceptability.ms, q_kind == 1), 
+                    family = 'binomial') # converges
+anova(faraway.base, faraway, test = 'lrt') ## the interaction does not significantly improve the fit, so we drop it from the model
+```
+
+```{r}
+##summary of main effects
+knitr::kable(summary(faraway.base)$coef)
+```
+
+#### Rule at school: Answer ~ Task + Age + (1|subid)
+**Note** Model will not converge with item random effect. 
+
+1.  Interaction between task and age not significant, so dropped from the model ($\chi^{2}$ = 1.08, *p* = 0.78)
+2.  Significant difference in acceptability between moral and conventional ($\beta$ = .91, *p* < .001)
+3.  Significant difference in acceptability between moral and conventional-Iran ($\beta$ = 1.45, *p* < .001)
+4.  Significant difference in acceptability between moral and religious ($\beta$ = 1.00, *p* < .001)
+5.  Significant effect of age ($\beta$ = 0.73, *p* = .002)
+```{r, include = FALSE}
+rule <- glmer(answer ~ task*age.c + (1|subid),
+                    data = subset(acceptability.ms, q_kind == 2),
+                    family = 'binomial') # converges
+
+## is the interaction between age and task significant?
+rule.base <- glmer(answer ~ task+age.c + (1|subid),
+                    data = subset(acceptability.ms, q_kind == 2), 
+                    family = 'binomial') # converges
+anova(rule.base, rule, test = 'lrt') ## the interaction does not significantly improve the fit, so we drop it from the model
+```
+
+```{r}
+##summary of main effects
+knitr::kable(summary(rule.base)$coef)
+```
+
+#### Foreigner: Answer ~ Task + Age +Task:Age + (1|subid)
+**Note** Model will not converge with item random effect. 
+
+1.  Significant interaction between task and age ($\chi^{2}$ = 13.56, *p* = .004)
+2.  No significant difference in acceptability between moral and conventional ($\beta$ = .54, *p* =.13)
+3.  Significant difference in acceptability between moral and conventional-Iran ($\beta$ = 2.01, *p* < .001)
+4.  Significant difference in acceptability between moral and religious ($\beta$ = 1.89, *p* < .001)
+5.  Marginal effect of age ($\beta$ = 0.73, *p* = .002)
+6.  No significant interaction between age and conventional items ($\beta$ = -0.17, *p* = .60)
+7.  No significant interaction between age and conventional-Iran items ($\beta$ = .03, *p* =.92)
+8.  Significant interaction between age and religious items (ie, as children age, they are more likely to rate it more acceptable for foreigners to make religious transgressions in comparsion to moral transgressions) ($\beta$ = .78, *p* =.02)
+```{r, include = FALSE}
+foreigner <- glmer(answer ~ task*age.c + (1|subid),
+                    data = subset(acceptability.ms, q_kind == 4),
+                    family = 'binomial', 
+                   control=glmerControl(optimizer="bobyqa",
+                                             optCtrl=list(maxfun=2e4))) # converges
+
+## is the interaction between age and task significant?
+foreigner.base <- glmer(answer ~ task+age.c + (1|subid),
+                    data = subset(acceptability.ms, q_kind == 4), 
+                    family = 'binomial', 
+                    control=glmerControl(optimizer="bobyqa",
+                                             optCtrl=list(maxfun=2e4))) # converges
+anova(foreigner.base, foreigner, test = 'lrt')
+```
+
+```{r}
+##summary of main effects
+knitr::kable(summary(foreigner)$coef)
+```
+
+#### Non-Muslim: Answer ~ Task + Age + Task:Age + (1|subid)
+**Note** Model will not converge with item random effect. 
+
+1.  Significant interaction between task and age ($\chi^{2}$ = 15.37, *p* = .002)
+2.  No significant difference in acceptability between moral and conventional ($\beta$ = .40, *p* =.30)
+3.  Significant difference in acceptability between moral and conventional-Iran ($\beta$ = 1.77, *p* < .001)
+4.  Significant difference in acceptability between moral and religious ($\beta$ = 2.38, *p* < .001)
+5.  No effect of age ($\beta$ = -0.08, *p* = .83)
+6.  Significant interaction between age and conventional items ($\beta$ = 0.85, *p* = .03)
+7.  Significant interaction between age and conventional-Iran items ($\beta$ = .77, *p* =.03)
+8.  Significant interaction between age and religious items ($\beta$ = 1.38, *p* < .001)
+```{r, include = FALSE}
+muslim <- glmer(answer ~ task*age.c + (1|subid),
+                    data = subset(acceptability.ms, q_kind == 5),
+                    family = 'binomial', 
+                   control=glmerControl(optimizer="bobyqa",
+                                             optCtrl=list(maxfun=2e4))) # converges
+
+## is the interaction between age and task significant?
+muslim.base <- glmer(answer ~ task+age.c + (1|subid),
+                    data = subset(acceptability.ms, q_kind == 5), 
+                    family = 'binomial', 
+                    control=glmerControl(optimizer="bobyqa",
+                                             optCtrl=list(maxfun=2e4))) # converges
+anova(muslim.base, muslim, test = 'lrt') 
+```
+
+```{r}
+##summary of main effects
+knitr::kable(summary(muslim)$coef)
+```
+
+#### Haram: Answer ~ Task + Age + (1|subid)
+**Note** Model will not converge with item random effect. 
+
+1.  No significant interaction between task and age ($\chi^{2}$ = 5.59, *p* = .13)
+2.  No significant difference between moral and conventional ($\beta$ = -0.41, *p* =.14)
+3.  Significant difference between moral and conventional-Iran ($\beta$ = -1.01, *p* < .001)
+4.  Significant difference between moral and religious ($\beta$ = 2.02, *p* < .001)
+5.  Significant effect of age ($\beta$ = -1.31, *p* < .001)
+```{r, include = FALSE}
+haram <- glmer(answer ~ task*age.c + (1|subid),
+                    data = subset(acceptability.ms, q_kind == 6),
+                    family = 'binomial', 
+                   control=glmerControl(optimizer="bobyqa",
+                                             optCtrl=list(maxfun=2e4))) # converges
+
+## is the interaction between age and task significant?
+haram.base <- glmer(answer ~ task+age.c + (1|subid),
+                    data = subset(acceptability.ms, q_kind == 6), 
+                    family = 'binomial', 
+                    control=glmerControl(optimizer="bobyqa",
+                                             optCtrl=list(maxfun=2e4))) # converges
+anova(haram.base,haram, test = 'lrt') ## the interaction does not significantly improve the fit, so we drop it from the model
+```
+
+```{r}
+##summary of main effects
+knitr::kable(summary(haram.base)$coef)
+```
+
+#### Illegal: Answer ~ Task + Age + (1|subid)
+**Note** Model will not converge with item random effect. 
+
+1.  No significant interaction between task and age ($\chi^{2}$ = 1.37, *p* = .71)
+2.  No significant difference between moral and conventional ($\beta$ = -0.03, *p* =.90)
+3.  Significant difference between moral and conventional-Iran ($\beta$ = -1.50, *p* < .001)
+4.  Significant difference moral and religious ($\beta$ = 0.78, *p* = .002)
+5.  Significant effect of age ($\beta$ = -1.12, *p* < .001)
+```{r, include = FALSE}
+illegal <- glmer(answer ~ task*age.c + (1|subid),
+                    data = subset(acceptability.ms, q_kind == 7),
+                    family = 'binomial', 
+                   control=glmerControl(optimizer="bobyqa",
+                                             optCtrl=list(maxfun=2e4))) # converges
+
+## is the interaction between age and task significant?
+illegal.base <- glmer(answer ~ task+age.c + (1|subid),
+                    data = subset(acceptability.ms, q_kind == 7), 
+                    family = 'binomial', 
+                    control=glmerControl(optimizer="bobyqa",
+                                             optCtrl=list(maxfun=2e4))) # converges
+anova(illegal.base,illegal, test = 'lrt') ## the interaction does not significantly improve the fit, so we drop it from the model
+```
+
+```{r}
+##summary of main effects
+knitr::kable(summary(illegal.base)$coef)
+```
+
+#### Zesht: Answer ~ Task + Age + (1|subid)
+**Note** Model will not converge with item random effect. 
+
+1.  No significant interaction between task and age ($\chi^{2}$ = 1.37, *p* = .71)
+2.  Significant difference between moral and conventional ($\beta$ = -1.87, *p* =.02)
+3.  Significant difference between moral and conventional-Iran ($\beta$ = -2.85, *p* < .001)
+4.  Significant difference between moral and religious ($\beta$ = -2.93, *p* < .001)
+5.  Significant effect of age ($\beta$ = -0.54, *p* = .02)
+```{r, include = FALSE}
+zesht <- glmer(as.factor(answer) ~ task*age.c + (1|subid),
+                    data = subset(acceptability.ms, q_kind == 8),
+                    family = 'binomial', 
+                   control=glmerControl(optimizer="bobyqa",
+                                             optCtrl=list(maxfun=2e4))) # converges
+
+## is the interaction between age and task significant?
+zesht.base <- glmer(as.factor(answer) ~ task+age.c + (1|subid),
+                    data = subset(acceptability.ms, q_kind == 8), 
+                    family = 'binomial', 
+                    control=glmerControl(optimizer="bobyqa",
+                                             optCtrl=list(maxfun=2e4))) # converges
+anova(zesht.base,zesht, test = 'lrt') ## the interaction does not significantly improve the fit, so we drop it from the model
+```
+
+```{r}
+##summary of main effects
+knitr::kable(summary(zesht.base)$coef)
+```
+
+
+
