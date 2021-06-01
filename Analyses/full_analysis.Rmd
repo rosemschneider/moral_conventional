@@ -706,10 +706,19 @@ knitr::kable(summary(rule.korea.base)$coef)
 ====
 
 ### Differences in ratings across cultures: Answer ~ Site x Task x Age + (1|subid)
+Tested for significance using likelihood ratio tests and nested model comparison. 
+1.  Significant effect of site ($\chi^{2}$ = 92.13, *p* < .001)
+2.  Significant effect of transgression type ($\chi^{2}$ = 87.96, *p* < .001)
+3.  Significant effect of age ($\chi^{2}$ = 20.57, *p* < .001)
+4.  Two-way interaction between task and age ($\chi^{2}$ = 7.06, *p* = .008)
+5.  Two-way interaction between site and task ($\chi^{2}$ = 25.50, *p* < .001)
+6.  NO two-way interaction between site and age ($\chi^{2}$ = 0.35, *p* = .95)
+7.  Three-way interaction between site, task, and age ( $\chi^{2}$ = 14.71, *p* = .002)
 ```{r, include = FALSE}
 ratings.ms <- ratings.ms %>%
   mutate(site = factor(site, levels = c("Canada", "India", "Iran", "Korea")))
 
+###### MAIN ANALYSIS ########
 #testing for main effects
 # site
 omnibus.base <- lmer(answer ~ task + age.c + (1|subid), 
@@ -791,14 +800,19 @@ omnibus.full <- lmer(answer ~ site * task * age.c + (1|subid),
                 control=lmerControl(optimizer="bobyqa",
                                              optCtrl=list(maxfun=2e4)))
 anova(omnibus.step0, omnibus.step1, omnibus.step2, omnibus.full, test = 'lrt')
+```
 
-summary(omnibus)
-anova(omnibus)
-
+Summary and pairwise comparisons for this omnibus model
+```{r}
+summary(omnibus.full)
 library(lsmeans)
 
-emmeans(omnibus, pairwise~site*task, adjust = "none")
+emmeans(omnibus.full, pairwise~site*task, adjust = "none")
+```
 
+##### Investigating 3-ways site:task:age interaction
+Testing hypothesis that it's driven by different ages across different testing sites. To do this, I filtered down to same-aged children (7-11); this affects mainly Canada and Iran.
+```{r, include = FALSE}
 ######################
 ### follow-up only including same-aged children 
 tmp <- ratings.ms %>%
@@ -884,96 +898,96 @@ omnibus.full <- lmer(answer ~ site * task * age.c + (1|subid),
                 data = tmp,
                 control=lmerControl(optimizer="bobyqa",
                                              optCtrl=list(maxfun=2e4)))
-anova(omnibus.step0, omnibus.step1, omnibus.step2, omnibus.full, test = 'lrt') ### No longer significant
+anova(omnibus.step0, omnibus.step1, omnibus.step2, omnibus.full, test = 'lrt') ### No longer significant\
 
-############ Now do it without india
-tmp <- ratings.ms %>%
-  filter(site != "India")
 
-#testing for main effects
-# site
-omnibus.base <- lmer(answer ~ task + age.c + (1|subid), 
-                data = tmp, 
-                control=lmerControl(optimizer="bobyqa",
-                                             optCtrl=list(maxfun=2e4)))
-omnibus.site <- lmer(answer ~ site + task + age.c + (1|subid), 
-                data = tmp, 
-                control=lmerControl(optimizer="bobyqa",
-                                             optCtrl=list(maxfun=2e4)))
-anova(omnibus.base, omnibus.site, test = 'lrt') ## significant effect of site
-
-# task
-omnibus.base <- lmer(answer ~ site + age.c + (1|subid), 
-                data = tmp, 
-                control=lmerControl(optimizer="bobyqa",
-                                             optCtrl=list(maxfun=2e4)))
-omnibus.task <- lmer(answer ~ task + site + age.c + (1|subid), 
-                data = tmp, 
-                control=lmerControl(optimizer="bobyqa",
-                                             optCtrl=list(maxfun=2e4)))
-anova(omnibus.base, omnibus.task, test = 'lrt') ## significant effect of task
-
-# age
-omnibus.base <- lmer(answer ~ site + task + (1|subid), 
-                data = tmp, 
-                control=lmerControl(optimizer="bobyqa",
-                                             optCtrl=list(maxfun=2e4)))
-omnibus.age <- lmer(answer ~ age.c + task + site + (1|subid), 
-                data = tmp, 
-                control=lmerControl(optimizer="bobyqa",
-                                             optCtrl=list(maxfun=2e4)))
-anova(omnibus.base, omnibus.age, test = 'lrt') ## significant effect of age
-
-### two-way interactions
-## task and age
-omnibus.taskageint <- lmer(answer ~ task:age.c + site + task + age.c +  (1|subid), 
-                data = tmp, 
-                control=lmerControl(optimizer="bobyqa",
-                                             optCtrl=list(maxfun=2e4)))
-anova(omnibus.site, omnibus.taskageint) #significant 2-way interaction of task and age
-
-## site and age
-omnibus.siteageint <- lmer(answer ~ site:age.c + site + task + age.c +  (1|subid), 
-                data = tmp, 
-                control=lmerControl(optimizer="bobyqa",
-                                             optCtrl=list(maxfun=2e4))) #not significant
-anova(omnibus.site, omnibus.siteageint, test= 'lrt') # not significant
-
-## site and task
-omnibus.tasksiteint <- lmer(answer ~ site:task + site + task + age.c +  (1|subid), 
-                data = tmp, 
-                control=lmerControl(optimizer="bobyqa",
-                                             optCtrl=list(maxfun=2e4))) 
-anova(omnibus.site, omnibus.tasksiteint) #significant 2-way interaction of task and site
-
-##three-way interaction
-## start with lowest AIC, which is site x task
-omnibus.step0 <- lmer(answer ~ site:task + site + task + age.c +  (1|subid), 
-                data = tmp, 
-                control=lmerControl(optimizer="bobyqa",
-                                             optCtrl=list(maxfun=2e4)))
-
-#now add the task:age interaction
-omnibus.step1 <-  lmer(answer ~ task:age.c + site:task + site + task + age.c +  (1|subid), 
-                data = tmp, 
-                control=lmerControl(optimizer="bobyqa",
-                                             optCtrl=list(maxfun=2e4)))
-
-##now add site:age.c
-omnibus.step2 <-  lmer(answer ~ site:task + task:age.c + site:age.c + site + task + age.c +  (1|subid), 
-                data = tmp, 
-                control=lmerControl(optimizer="bobyqa",
-                                             optCtrl=list(maxfun=2e4)))
-
-## now the full three-way
-omnibus.full <- lmer(answer ~ site * task * age.c + (1|subid),
-                data = tmp,
-                control=lmerControl(optimizer="bobyqa",
-                                             optCtrl=list(maxfun=2e4)))
-anova(omnibus.step0, omnibus.step1, omnibus.step2, omnibus.full, test = 'lrt') ### No longer significant
-summary(omnibus.full)
+######## ALSO WITHOUT INDIA#######
+# 
+# ############ Now do it without india
+# tmp <- ratings.ms %>%
+#   filter(site != "India")
+# 
+# #testing for main effects
+# # site
+# omnibus.base <- lmer(answer ~ task + age.c + (1|subid), 
+#                 data = tmp, 
+#                 control=lmerControl(optimizer="bobyqa",
+#                                              optCtrl=list(maxfun=2e4)))
+# omnibus.site <- lmer(answer ~ site + task + age.c + (1|subid), 
+#                 data = tmp, 
+#                 control=lmerControl(optimizer="bobyqa",
+#                                              optCtrl=list(maxfun=2e4)))
+# anova(omnibus.base, omnibus.site, test = 'lrt') ## significant effect of site
+# 
+# # task
+# omnibus.base <- lmer(answer ~ site + age.c + (1|subid), 
+#                 data = tmp, 
+#                 control=lmerControl(optimizer="bobyqa",
+#                                              optCtrl=list(maxfun=2e4)))
+# omnibus.task <- lmer(answer ~ task + site + age.c + (1|subid), 
+#                 data = tmp, 
+#                 control=lmerControl(optimizer="bobyqa",
+#                                              optCtrl=list(maxfun=2e4)))
+# anova(omnibus.base, omnibus.task, test = 'lrt') ## significant effect of task
+# 
+# # age
+# omnibus.base <- lmer(answer ~ site + task + (1|subid), 
+#                 data = tmp, 
+#                 control=lmerControl(optimizer="bobyqa",
+#                                              optCtrl=list(maxfun=2e4)))
+# omnibus.age <- lmer(answer ~ age.c + task + site + (1|subid), 
+#                 data = tmp, 
+#                 control=lmerControl(optimizer="bobyqa",
+#                                              optCtrl=list(maxfun=2e4)))
+# anova(omnibus.base, omnibus.age, test = 'lrt') ## significant effect of age
+# 
+# ### two-way interactions
+# ## task and age
+# omnibus.taskageint <- lmer(answer ~ task:age.c + site + task + age.c +  (1|subid), 
+#                 data = tmp, 
+#                 control=lmerControl(optimizer="bobyqa",
+#                                              optCtrl=list(maxfun=2e4)))
+# anova(omnibus.site, omnibus.taskageint) #significant 2-way interaction of task and age
+# 
+# ## site and age
+# omnibus.siteageint <- lmer(answer ~ site:age.c + site + task + age.c +  (1|subid), 
+#                 data = tmp, 
+#                 control=lmerControl(optimizer="bobyqa",
+#                                              optCtrl=list(maxfun=2e4))) #not significant
+# anova(omnibus.site, omnibus.siteageint, test= 'lrt') # not significant
+# 
+# ## site and task
+# omnibus.tasksiteint <- lmer(answer ~ site:task + site + task + age.c +  (1|subid), 
+#                 data = tmp, 
+#                 control=lmerControl(optimizer="bobyqa",
+#                                              optCtrl=list(maxfun=2e4))) 
+# anova(omnibus.site, omnibus.tasksiteint) #significant 2-way interaction of task and site
+# 
+# ##three-way interaction
+# ## start with lowest AIC, which is site x task
+# omnibus.step0 <- lmer(answer ~ site:task + site + task + age.c +  (1|subid), 
+#                 data = tmp, 
+#                 control=lmerControl(optimizer="bobyqa",
+#                                              optCtrl=list(maxfun=2e4)))
+# 
+# #now add the task:age interaction
+# omnibus.step1 <-  lmer(answer ~ task:age.c + site:task + site + task + age.c +  (1|subid), 
+#                 data = tmp, 
+#                 control=lmerControl(optimizer="bobyqa",
+#                                              optCtrl=list(maxfun=2e4)))
+# 
+# ##now add site:age.c
+# omnibus.step2 <-  lmer(answer ~ site:task + task:age.c + site:age.c + site + task + age.c +  (1|subid), 
+#                 data = tmp, 
+#                 control=lmerControl(optimizer="bobyqa",
+#                                              optCtrl=list(maxfun=2e4)))
+# 
+# ## now the full three-way
+# omnibus.full <- lmer(answer ~ site * task * age.c + (1|subid),
+#                 data = tmp,
+#                 control=lmerControl(optimizer="bobyqa",
+#                                              optCtrl=list(maxfun=2e4)))
+# anova(omnibus.step0, omnibus.step1, omnibus.step2, omnibus.full, test = 'lrt') ### No longer significant
+# summary(omnibus.full)
 ```
 
-```{r}
-emmeans::emmeans(omnibus, pairwise ~ site | task | age.c)
-```
