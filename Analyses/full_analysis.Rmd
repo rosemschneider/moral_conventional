@@ -5,7 +5,7 @@ date: "3/3/2021"
 output: html_document
 ---
 
-```{r setup, include=FALSE}
+```{r setup, include=FALSE, warning=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 source(here::here("Analyses/0-clean.R")) 
 
@@ -403,7 +403,7 @@ acceptability.ms <- study1_data %>%
 
 #### India
 **High level summary** 
-For the most part, there is no significant difference between moral and conventional items for acceptability EXCEPT in the situation where "everyone else was doing it." In that case, there is a difference between moral and conventional items when you do NOT include the item random effect in the model.
+No significant difference between moral and conventional items for acceptability.
 
 ##### If everyone else were doing it: Answer ~ Task + Age + (1|subid) + (1|item)
 1.  Interaction between task and age not significant, so dropped from the model ($\chi^{2}$ = 0.19, *p* = 0.66)
@@ -424,27 +424,6 @@ anova(everyone.india.base, everyone.india, test = 'lrt') ## the interaction does
 ```{r}
 ##summary of main effects
 knitr::kable(summary(everyone.india.base)$coef)
-```
-
-##### Model without item random effect: If everyone else were doing it: Answer ~ Task + Age + (1|subid)
-1.  Interaction between task and age not significant, so dropped from the model ($\chi^{2}$ = 0.22, *p* = 0.64)
-2.  Significant difference in acceptability between moral and conventional ($\beta$ = 1.04, *p* = .001)
-3.  No significant effect of age ($\beta$ = -0.15, *p* = 0.81)
-```{r, include = FALSE}
-everyone.india.noitem <- glmer(answer ~ task*age.c + (1|subid),
-                    data = subset(acceptability.ms, q_kind == 3 & site == "India"),
-                    family = 'binomial') # converges
-
-## is the interaction between age and task significant?
-everyone.india.base.noitem <- glmer(answer ~ task+age.c + (1|subid), 
-                    data = subset(acceptability.ms, q_kind == 3 & site == "India"), 
-                    family = 'binomial') # converges
-anova(everyone.india.base.noitem, everyone.india.noitem, test = 'lrt') ## the interaction does not significantly improve the fit, so we drop it from the model
-```
-
-```{r}
-##summary of main effects
-knitr::kable(summary(everyone.india.base.noitem)$coef)
 ```
 
 ##### Far-away country: Answer ~ task + age + (1|subid)
@@ -495,7 +474,7 @@ knitr::kable(summary(rule.india.base)$coef)
 
 #### Iran
 **High level summary** 
-No significant effects of task EXCEPT for the "far away country" scenario, where children judge conventional items more acceptable in the model WITHOUT the item random effect.
+No significant effects of task - some marginal effect in "everyone else" and "rule at school"
 
 #### If everyone else were doing it: Answer ~ Task + Age + (1|subid)
 **Note** The model with the item random effect does not converge, so this is our only model
@@ -548,6 +527,7 @@ knitr::kable(summary(faraway.iran.base)$coef)
 2.  No significant differences between tasks ($\beta$ = 0.56, *p* = .43)
 3.  No significant effect of age ($\beta$ = -0.61, *p* = .43)
 4.  No significant interaction between age and task ($\beta$ = -0.44, *p* = .42)
+
 ```{r, include = FALSE}
 rule.iran <- glmer(answer ~ task*age.c + (1|subid), 
                        data = subset(acceptability.ms, q_kind == 2 & site == "Iran"), 
@@ -637,9 +617,8 @@ knitr::kable(summary(rule.canada.base)$coef)
 
 #### Korea
 **High level summary**
-Some significant differences between tasks: 
-1.  In the "everyone else is doing it" regardless of whether model includes item random effect
-2.  In the "rule at school" ONLY in the model without the item random effect.
+Significant differences between tasks in the "everyone else is doing it" regardless of whether model includes item random effect
+
 ##### If everyone else were doing it: Answer ~ Task + Age + (1|subid) + (1|item)
 1.  Interaction between task and age not significant, so dropped from the model ($\chi^{2}$ = 0.83, *p* = 0.36)
 2.  Significant difference in acceptability between moral and conventional ($\beta$ = 1.73, *p* = .006)
@@ -707,6 +686,7 @@ knitr::kable(summary(rule.korea.base)$coef)
 
 ### Differences in ratings across cultures: Answer ~ Site x Task x Age + (1|subid)
 Tested for significance using likelihood ratio tests and nested model comparison. 
+
 1.  Significant effect of site ($\chi^{2}$ = 92.13, *p* < .001)
 2.  Significant effect of transgression type ($\chi^{2}$ = 87.96, *p* < .001)
 3.  Significant effect of age ($\chi^{2}$ = 20.57, *p* < .001)
@@ -714,6 +694,7 @@ Tested for significance using likelihood ratio tests and nested model comparison
 5.  Two-way interaction between site and task ($\chi^{2}$ = 25.50, *p* < .001)
 6.  NO two-way interaction between site and age ($\chi^{2}$ = 0.35, *p* = .95)
 7.  Three-way interaction between site, task, and age ( $\chi^{2}$ = 14.71, *p* = .002)
+
 ```{r, include = FALSE}
 ratings.ms <- ratings.ms %>%
   mutate(site = factor(site, levels = c("Canada", "India", "Iran", "Korea")))
@@ -810,10 +791,13 @@ library(lsmeans)
 emmeans(omnibus.full, pairwise~site*task, adjust = "none")
 ```
 
-##### Investigating 3-ways site:task:age interaction
-Testing hypothesis that it's driven by different ages across different testing sites. To do this, I filtered down to same-aged children (7-11); this affects mainly Canada and Iran.
+
 ```{r, include = FALSE}
 ######################
+
+##### Investigating 3-ways site:task:age interaction
+#Testing hypothesis that it's driven by different ages across different testing sites. To do this, I filtered down to same-aged children (7-11); this affects mainly Canada and Iran.
+
 ### follow-up only including same-aged children 
 tmp <- ratings.ms %>%
   filter(age >= 7 & age <= 11)
