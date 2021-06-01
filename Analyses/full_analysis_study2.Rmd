@@ -197,6 +197,7 @@ set.seed(1234) #set random seed for reproducibility
 
 ### Model: Answer ~ Task + Age + (1|subid)
 **Note** Item model will not converge, so this is our only model
+
 1.  No significant interaction between age and task ($\chi^{2}$ = 5.33, *p* = 0.15)
 2.  No significant difference between MORAL and CONVENTIONAL items ($\beta$ = 0.04, *p* = .57)
 3.  Significant difference between MORAL and CONVENTIONAL IRAN items ($\beta$ = 0.44, *p* < .001)
@@ -326,6 +327,7 @@ acceptability.ms <- study2_data %>%
 3.  Significant difference in acceptability between moral and conventional-Iran ($\beta$ = 1.84, *p* < .001)
 4.  No significant difference in acceptability between moral and religious ($\beta$ = .13, *p* = .70)
 5.  Significant effect of age ($\beta$ = 0.92, *p* < .001)
+
 ```{r, include = FALSE}
 everyone <- glmer(answer ~ task*age.c + (1|subid),
                     data = subset(acceptability.ms, q_kind == 3),
@@ -351,6 +353,7 @@ knitr::kable(summary(everyone.base)$coef)
 3.  Significant difference in acceptability between moral and conventional-Iran ($\beta$ = 1.51, *p* < .001)
 4.  Significant difference in acceptability between moral and religious ($\beta$ = 1.70, *p* < .001)
 5.  Significant effect of age ($\beta$ = 0.70, *p* = .002)
+
 ```{r, include = FALSE}
 faraway <- glmer(answer ~ task*age.c + (1|subid),
                     data = subset(acceptability.ms, q_kind == 1),
@@ -376,6 +379,7 @@ knitr::kable(summary(faraway.base)$coef)
 3.  Significant difference in acceptability between moral and conventional-Iran ($\beta$ = 1.45, *p* < .001)
 4.  Significant difference in acceptability between moral and religious ($\beta$ = 1.00, *p* < .001)
 5.  Significant effect of age ($\beta$ = 0.73, *p* = .002)
+
 ```{r, include = FALSE}
 rule <- glmer(answer ~ task*age.c + (1|subid),
                     data = subset(acceptability.ms, q_kind == 2),
@@ -404,6 +408,7 @@ knitr::kable(summary(rule.base)$coef)
 6.  No significant interaction between age and conventional items ($\beta$ = -0.17, *p* = .60)
 7.  No significant interaction between age and conventional-Iran items ($\beta$ = .03, *p* =.92)
 8.  Significant interaction between age and religious items (ie, as children age, they are more likely to rate it more acceptable for foreigners to make religious transgressions in comparsion to moral transgressions) ($\beta$ = .78, *p* =.02)
+
 ```{r, include = FALSE}
 foreigner <- glmer(answer ~ task*age.c + (1|subid),
                     data = subset(acceptability.ms, q_kind == 4),
@@ -436,6 +441,7 @@ knitr::kable(summary(foreigner)$coef)
 6.  Significant interaction between age and conventional items ($\beta$ = 0.85, *p* = .03)
 7.  Significant interaction between age and conventional-Iran items ($\beta$ = .77, *p* =.03)
 8.  Significant interaction between age and religious items ($\beta$ = 1.38, *p* < .001)
+
 ```{r, include = FALSE}
 muslim <- glmer(answer ~ task*age.c + (1|subid),
                     data = subset(acceptability.ms, q_kind == 5),
@@ -465,6 +471,7 @@ knitr::kable(summary(muslim)$coef)
 3.  Significant difference between moral and conventional-Iran ($\beta$ = -1.01, *p* < .001)
 4.  Significant difference between moral and religious ($\beta$ = 2.02, *p* < .001)
 5.  Significant effect of age ($\beta$ = -1.31, *p* < .001)
+
 ```{r, include = FALSE}
 haram <- glmer(answer ~ task*age.c + (1|subid),
                     data = subset(acceptability.ms, q_kind == 6),
@@ -494,6 +501,7 @@ knitr::kable(summary(haram.base)$coef)
 3.  Significant difference between moral and conventional-Iran ($\beta$ = -1.50, *p* < .001)
 4.  Significant difference moral and religious ($\beta$ = 0.78, *p* = .002)
 5.  Significant effect of age ($\beta$ = -1.12, *p* < .001)
+
 ```{r, include = FALSE}
 illegal <- glmer(answer ~ task*age.c + (1|subid),
                     data = subset(acceptability.ms, q_kind == 7),
