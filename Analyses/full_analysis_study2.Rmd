@@ -210,7 +210,7 @@ iran.rating <- lmer(answer ~ task*age.c + (1|subid),
 ##test to see if interaction is significant
 iran.rating.base <- lmer(answer ~ task+age.c + (1|subid), 
                     data = ratings.ms)
-anova(iran.rating.base, iran.rating, test = 'lrt')
+anova(iran.rating.base, iran.rating, test = 'lrt') #it's not, so don't include it
 
 ## get the chisq of the task & age
 iran.base.base <-  lmer(answer ~ task + (1|subid), 
@@ -248,7 +248,10 @@ study2_data %>%
            q_kind_label != "Zesht")%>%
   mutate(task = factor(task, levels = c("moral", "conv", "conv.iran", "religious"), 
                        labels = c("Moral", "Conventional", "Conventional - Iran", "Religious")), 
-         q_kind_label = factor(q_kind_label, levels = c("Everyone else", "Faraway country", "Rule at school", "Foreigner", 
+         q_kind_label = ifelse(q_kind_label == "Rule at school",
+                               "No rule at school", as.character(q_kind_label)), 
+         q_kind_label = factor(q_kind_label, levels = c("Faraway country", "No rule at school",
+                                                        "Everyone else", "Foreigner", 
                                                         "Non-Muslim")))%>%
   ggplot(aes(x = task, y = answer, fill = task, color = task)) + 
   stat_summary(fun = mean, position = position_dodge(width = .9),
@@ -271,7 +274,7 @@ study2_data %>%
        fill = "Transgression") + 
   ggtitle("Would it be okay...") +
   scale_y_continuous(breaks = seq(0, .50, .25))
-ggsave("study2_acceptability_ratings_main.png", height = 3, width = 8.5)
+ggsave("study2_acceptability_ratings_main.png", height = 3, width = 9)
 
 ```
 
@@ -283,7 +286,9 @@ study2_data %>%
            q_kind_label == "Illegal" |
            q_kind_label == "Zesht")%>%
   mutate(task = factor(task, levels = c("moral", "conv", "conv.iran", "religious"), 
-                       labels = c("Moral", "Conventional", "Conventional - Iran", "Religious")))%>%
+                       labels = c("Moral", "Conventional", "Conventional - Iran", "Religious")), 
+         q_kind_label = ifelse(q_kind_label == "Haram", "A sin", 
+                                      ifelse(q_kind_label == "Zesht", "Rude", "Illegal")))%>%
   ggplot(aes(x = task, y = answer, fill = task, color = task)) + 
   stat_summary(fun = mean, position = position_dodge(width = .9),
                geom="bar", colour = "black") +
@@ -552,5 +557,155 @@ anova(zesht.base,zesht, test = 'lrt') ## the interaction does not significantly 
 knitr::kable(summary(zesht.base)$coef)
 ```
 
+## Now we need to look at how acceptability differs under different circumstances
 
+### ... first is faraway, everyone, rule, foreigner, and muslim 
+```{r}
+acceptability.limited <- acceptability.ms %>%
+  filter(q_kind_label != "Illegal", 
+         q_kind_label != "Haram", 
+         q_kind_label != "Zesht")
+
+
+#### visualization
+acceptability.limited %>%
+  mutate(q_kind_label = ifelse (q_kind_label == "Rule at school", 
+                                "No rule at school", as.character(q_kind_label)), 
+         q_kind_label = factor(q_kind_label, levels = c("Faraway country", 
+                                                        "No rule at school", 
+                                                        "Everyone else", 
+                                                        "Foreigner",
+                                                        "Non-Muslim")))%>%
+  mutate(task = factor(task, levels = c("moral", "conv", "conv.iran", "religious"),
+                       labels = c("Moral", "Conventional", 
+                                  "Conventional - Iran", "Religious")))%>%
+  ggplot(aes(x = task, y = answer, fill = q_kind_label)) + 
+  stat_summary(fun = mean, position = position_dodge(width = .9),
+               geom="bar", colour = "black") +
+  stat_summary(fun.data = "mean_cl_boot", geom="linerange", 
+               position = position_dodge(width=0.9), size = 1, color = "black") +
+  geom_hline(yintercept = .5, color = "grey", linetype = "dashed") + 
+  theme(legend.position = "right", 
+        legend.key.size = unit(.5, 'cm'), 
+        legend.text = element_text(size = 8), 
+        legend.title = element_text(size = 9), 
+        legend.margin=margin(t = 0, unit='cm'), 
+        axis.text.x = element_text(hjust = 1, angle = 45)) +
+  scale_fill_brewer(palette = "Dark2") +
+  labs(y = "Mean acceptability", 
+       x = "", 
+       fill = "Situation")
+ggsave("circumstances_study2.png", height = 3.5, width = 8)
+```
+
+```{r}
+## Now run some analyses
+######## Moral items first ########
+iran.circumstances.base <- glmer(answer ~ age.c + (1|subid), 
+                                 family = "binomial", 
+                                 data = subset(acceptability.limited, task == "moral"))
+## add q kind
+iran.circumstances <- glmer(answer ~ q_kind_label + age.c + (1|subid), 
+                                 family = "binomial", 
+                                 data = subset(acceptability.limited, task == "moral"))
+anova(iran.circumstances.base, iran.circumstances, test = 'lrt') #significant effect of circumstances, chisq = 16.724
+
+emmeans::emmeans(iran.circumstances, pairwise~q_kind_label, adjust = "none")
+## rule contingency effect for moral items - much more likely to 
+
+######## conventional ########
+iran.circumstances.base.conv <- glmer(answer ~ age.c + (1|subid), 
+                                 family = "binomial", 
+                                 data = subset(acceptability.limited, task == "conv"))
+## add q kind
+iran.circumstances.conv <- glmer(answer ~ q_kind_label + age.c + (1|subid), 
+                                 family = "binomial", 
+                                 data = subset(acceptability.limited, task == "conv"))
+anova(iran.circumstances.base.conv, iran.circumstances.conv, test = 'lrt') #significant effect of circumstances, chisq = 52.276
+
+emmeans::emmeans(iran.circumstances.conv, pairwise~q_kind_label, adjust = "none")
+
+######## conventional - iran ########
+iran.circumstances.base.conv.iran <- glmer(answer ~ age.c + (1|subid), 
+                                 family = "binomial", 
+                                 data = subset(acceptability.limited, task == "conv.iran"))
+## add q kind
+iran.circumstances.conv.iran <- glmer(answer ~ q_kind_label + age.c + (1|subid), 
+                                 family = "binomial", 
+                                 data = subset(acceptability.limited, task == "conv.iran"))
+anova(iran.circumstances.base.conv.iran, iran.circumstances.conv.iran, test = 'lrt') #significant effect of circumstances, chisq = 13.401
+
+emmeans::emmeans(iran.circumstances.conv.iran, pairwise~q_kind_label, adjust = "none")
+
+######## religious ########
+iran.circumstances.base.religious <- glmer(answer ~ age.c + (1|subid), 
+                                 family = "binomial", 
+                                 data = subset(acceptability.limited, task == "religious"), 
+                                  control=glmerControl(optimizer="bobyqa",
+                                             optCtrl=list(maxfun=2e4)))
+## add q kind
+iran.circumstances.religious <- glmer(answer ~ q_kind_label + age.c + (1|subid), 
+                                 family = "binomial", 
+                                 data = subset(acceptability.limited, task == "religious"), 
+                                  control=glmerControl(optimizer="bobyqa",
+                                             optCtrl=list(maxfun=2e4)))
+anova(iran.circumstances.base.religious, iran.circumstances.religious, test = 'lrt') #significant effect of circumstances, chisq = 69.814
+
+emmeans::emmeans(iran.circumstances.religious, pairwise~q_kind_label, adjust = "none")
+```
+
+## Justifications
+```{r}
+# Read in the justification data
+justifications <- read.csv("../Data/Raw data/Study2/Justifications.csv")%>%
+  filter(justifications != "", 
+         !is.na(Final.theme))%>%
+  mutate(Final.theme = ifelse(Final.theme == " disrespect", "disrespect", 
+                              ifelse((Final.theme == "religious " | Final.theme == "reliigious"), "religious", as.character(Final.theme))))
+```
+
+### .... visualization of theme x frequency
+```{r}
+justifications %>%
+  group_by(Final.theme)%>%
+  summarise(n = n())%>%
+  arrange(desc(n))%>%
+  mutate(Final.theme = fct_reorder(factor(Final.theme), n, .desc = TRUE))%>%
+  ggplot(aes(x = Final.theme, y = n, fill = Final.theme))+
+  geom_bar(stat = "identity", color = "black") +
+  theme(axis.text.x = element_text(hjust = 1, angle = 45), 
+        legend.position = "none") + 
+  labs(x = "Justification theme", 
+       y = "Frequency") + 
+  langcog::scale_fill_solarized("Justification theme")
+```
+
+### .... visualization of frequency of justification theme for different kinds of items
+```{r}
+moral <- c("push", "bad name", "drawing")
+conventional <- c("table", "swimsuit", "teacher", "toys", "toys ")
+conventional_iran <- c("shoes in house", "back to elder", "drink", "slippers")
+religious <- c("fasting", "prayer", "red clothes", "joke")
+
+justifications %>%
+  filter(item != "")%>%
+  mutate(transgression = ifelse(item %in% moral, "Moral", 
+                                ifelse(item %in% conventional, "Conventional", 
+                                       ifelse(item %in% conventional_iran, "Conventional-Iran", "Religious"))), 
+         transgression = factor(transgression, levels = c("Moral", "Conventional", 
+                                                          "Conventional-Iran", "Religious")))%>%
+  group_by(transgression, Final.theme)%>%
+  summarise(n = n())%>%
+  # arrange(desc(n))%>%
+  # mutate(Final.theme = fct_reorder(factor(Final.theme), n, .desc = TRUE))%>%
+  ggplot(aes(x = Final.theme, y = n, fill = Final.theme))+
+  geom_bar(stat = "identity", color = "black") +
+  theme(axis.text.x = element_text(hjust = 1, angle = 45), 
+        legend.position = "none") + 
+  labs(x = "Justification theme", 
+       y = "Frequency") + 
+  facet_grid(~transgression) +
+  langcog::scale_fill_solarized("Justification theme")
+ggsave("justifications_theme.png", width = 9, height = 3.5)
+```
 

@@ -121,6 +121,20 @@ study1_data %>%
   dplyr::rename("n" = "sum")%>%
   dplyr::select(site, item, n, mean, sd, median, min, max)%>%
   knitr::kable()
+
+study1_data %>%
+  filter(q_kind == 0)%>%
+  group_by(site)%>%
+  summarise_at('answer', 
+               list(~mean(., na.rm=T), 
+                    ~sd(., na.rm=T),
+                    ~median(., na.rm=T),
+                    ~min(., na.rm=T),
+                    ~max(., na.rm=T),
+                    ~sum(!is.na(.))))%>%
+  dplyr::rename("n" = "sum")%>%
+  dplyr::select(site, n, mean, sd, median, min, max)%>%
+  knitr::kable()
   
 ```
 
@@ -175,6 +189,7 @@ study1_data %>%
   labs(x = "Age", 
        y = "Rating") + 
   facet_grid(~site, scale = "free_x")
+ggsave("../Analyses/Figures/age_ratings.png", height = 3)
 ```
 
 ### Visualization of mean rating (by item) by site
@@ -271,6 +286,12 @@ summary(ratings.iran)
 ratings.iran.base <- lmer(answer ~ task+age.c + (task|subid) + (1|item), 
                       data = subset(ratings.ms, site == "Iran")) # This converges
 anova(ratings.iran.base, ratings.iran, test = 'lrt') # does not improve model fit
+
+## does removing the item random effect produce moral/conventional distinction?
+ratings.iran.base.noitem <- lmer(answer ~ task+age.c + (task|subid), 
+                      data = subset(ratings.ms, site == "Iran")) 
+
+summary(ratings.iran.base.noitem)
 ```
 
 ```{r}
@@ -363,9 +384,9 @@ study1_data %>%
   filter(q_kind != 0)%>%
   mutate(task = factor(task, levels = c("moral", "conv"), 
                        labels = c("Moral", "Conventional")), 
-         q_kind_label = factor(q_kind_label, labels = c("If everyone else did it?", 
-                                                        "In a faraway country?", 
-                                                        "If there's a school rule?")))%>%
+         q_kind_label = factor(q_kind_label, labels = c("In a faraway country?", 
+                                                        "If there's no school rule?",
+                                                        "If everyone else did it?")))%>%
   ggplot(aes(x = site, y = answer, fill = task, color = task)) + 
   stat_summary(fun = mean, position = position_dodge(width = .9),
                geom="bar", colour = "black") + 
@@ -387,7 +408,7 @@ study1_data %>%
   guides(fill = guide_legend(title.position = "top")) +
   scale_y_continuous(breaks = seq(0, 1,.25)) + 
   ggtitle("Would it be okay...")
-ggsave("mean_acceptability.png", height = 3)
+ggsave("mean_acceptability.png", height = 3, width = 7)
 ```
 
 
@@ -470,6 +491,34 @@ knitr::kable(summary(rule.india.base)$coef)
 ```
 
 
+### ... Is there an interaction between circumstances and task? 
+
+```{r}
+acceptability.ms.int <- acceptability.ms %>%
+  mutate(q_kind = factor(q_kind))
+
+circumstances_int_india <- glmer(answer ~ task + age.c + (1|subid), 
+                                 family = binomial, 
+                                 control=glmerControl(optimizer="bobyqa",
+                                             optCtrl=list(maxfun=2e4)),
+                                 data = subset(acceptability.ms.int, site == "India"))
+circumstances_int_india_q <- glmer(answer ~ q_kind + task + age.c + (1|subid), 
+                                 family = binomial, 
+                                 control=glmerControl(optimizer="bobyqa",
+                                             optCtrl=list(maxfun=2e4)),
+                                 data = subset(acceptability.ms.int, site == "India"))
+circumstances_int_india_int <- glmer(answer ~ q_kind*task + age.c + (1|subid), 
+                                 family = binomial, 
+                                 control=glmerControl(optimizer="bobyqa",
+                                             optCtrl=list(maxfun=2e4)),
+                                 data = subset(acceptability.ms.int, site == "India"))
+anova(circumstances_int_india, circumstances_int_india_q, circumstances_int_india_int, 
+      test = 'lrt')
+
+summary(circumstances_int_india_int)
+emmeans::emmeans(circumstances_int_india_int, pairwise~q_kind*task, adjust = "none")
+```
+
 ----
 
 #### Iran
@@ -541,9 +590,33 @@ anova(rule.iran.base, rule.iran, test = 'lrt') #does not improve model fit
 
 ```{r}
 #Main effects
-knitr::kable(summary(rule.iran)$coef)
+knitr::kable(summary(rule.iran.base)$coef)
 ```
 
+### ... is there an interaction between circumstances and task in acceptability rating?
+
+```{r}
+circumstances_int_iran <- glmer(answer ~ task + age.c + (1|subid), 
+                                 family = binomial, 
+                                 control=glmerControl(optimizer="bobyqa",
+                                             optCtrl=list(maxfun=2e4)),
+                                 data = subset(acceptability.ms.int, site == "Iran"))
+circumstances_int_iran_q <- glmer(answer ~ q_kind + task + age.c + (1|subid), 
+                                 family = binomial, 
+                                 control=glmerControl(optimizer="bobyqa",
+                                             optCtrl=list(maxfun=2e4)),
+                                 data = subset(acceptability.ms.int, site == "Iran"))
+circumstances_int_iran_int <- glmer(answer ~ q_kind*task + age.c + (1|subid), 
+                                 family = binomial, 
+                                 control=glmerControl(optimizer="bobyqa",
+                                             optCtrl=list(maxfun=2e4)),
+                                 data = subset(acceptability.ms.int, site == "Iran"))
+anova(circumstances_int_iran, circumstances_int_iran_q, circumstances_int_iran_int, 
+      test = 'lrt')
+
+summary(circumstances_int_iran_int)
+emmeans::emmeans(circumstances_int_iran_int, pairwise~q_kind*task, adjust = "none")
+```
 
 -----
 
@@ -611,6 +684,31 @@ anova(rule.canada.base, rule.canada, test = 'lrt') #does not improve model fit
 ```{r}
 #Main effects
 knitr::kable(summary(rule.canada.base)$coef)
+```
+
+### ... Is there an interaction between circumstances and task?
+
+```{r}
+circumstances_int_canada <- glmer(answer ~ task + age.c + (1|subid), 
+                                 family = binomial, 
+                                 control=glmerControl(optimizer="bobyqa",
+                                             optCtrl=list(maxfun=2e4)),
+                                 data = subset(acceptability.ms.int, site == "Canada"))
+circumstances_int_canada_q <- glmer(answer ~ q_kind + task + age.c + (1|subid), 
+                                 family = binomial, 
+                                 control=glmerControl(optimizer="bobyqa",
+                                             optCtrl=list(maxfun=2e4)),
+                                 data = subset(acceptability.ms.int, site == "Canada"))
+circumstances_int_canada_int <- glmer(answer ~ q_kind*task + age.c + (1|subid), 
+                                 family = binomial, 
+                                 control=glmerControl(optimizer="bobyqa",
+                                             optCtrl=list(maxfun=2e4)),
+                                 data = subset(acceptability.ms.int, site == "Canada"))
+anova(circumstances_int_canada, circumstances_int_canada_q, circumstances_int_canada_int, 
+      test = 'lrt')
+
+summary(circumstances_int_canada_int)
+emmeans::emmeans(circumstances_int_canada_int, pairwise~q_kind*task, adjust = "none")
 ```
 
 ----
@@ -682,6 +780,29 @@ anova(rule.korea.base, rule.korea, test = 'lrt') #does not improve model fit
 knitr::kable(summary(rule.korea.base)$coef)
 ```
 
+```{r}
+circumstances_int_korea <- glmer(answer ~ task + age.c + (1|subid), 
+                                 family = binomial, 
+                                 control=glmerControl(optimizer="bobyqa",
+                                             optCtrl=list(maxfun=2e4)),
+                                 data = subset(acceptability.ms.int, site == "Korea"))
+circumstances_int_korea_q <- glmer(answer ~ q_kind + task + age.c + (1|subid), 
+                                 family = binomial, 
+                                 control=glmerControl(optimizer="bobyqa",
+                                             optCtrl=list(maxfun=2e4)),
+                                 data = subset(acceptability.ms.int, site == "Korea"))
+circumstances_int_korea_int <- glmer(answer ~ q_kind*task + age.c + (1|subid), 
+                                 family = binomial, 
+                                 control=glmerControl(optimizer="bobyqa",
+                                             optCtrl=list(maxfun=2e4)),
+                                 data = subset(acceptability.ms.int, site == "Korea"))
+anova(circumstances_int_korea, circumstances_int_korea_q, circumstances_int_korea_int, 
+      test = 'lrt')
+
+summary(circumstances_int_korea_int)
+emmeans::emmeans(circumstances_int_korea_int, pairwise~q_kind*task, adjust = "none")
+```
+
 ====
 
 ### Differences in ratings across cultures: Answer ~ Site x Task x Age + (1|subid)
@@ -701,91 +822,15 @@ ratings.ms <- ratings.ms %>%
 
 ###### MAIN ANALYSIS ########
 #testing for main effects
-# site
-omnibus.base <- lmer(answer ~ task + age.c + (1|subid), 
-                data = ratings.ms, 
-                control=lmerControl(optimizer="bobyqa",
+omnibus.full <- lmer(answer ~ site*task*age.c + (1|subid), 
+                    data = ratings.ms, 
+                    control=lmerControl(optimizer="bobyqa",
                                              optCtrl=list(maxfun=2e4)))
-omnibus.site <- lmer(answer ~ site + task + age.c + (1|subid), 
-                data = ratings.ms, 
-                control=lmerControl(optimizer="bobyqa",
-                                             optCtrl=list(maxfun=2e4)))
-anova(omnibus.base, omnibus.site, test = 'lrt') ## significant effect of site
-
-# task
-omnibus.base <- lmer(answer ~ site + age.c + (1|subid), 
-                data = ratings.ms, 
-                control=lmerControl(optimizer="bobyqa",
-                                             optCtrl=list(maxfun=2e4)))
-omnibus.task <- lmer(answer ~ task + site + age.c + (1|subid), 
-                data = ratings.ms, 
-                control=lmerControl(optimizer="bobyqa",
-                                             optCtrl=list(maxfun=2e4)))
-anova(omnibus.base, omnibus.task, test = 'lrt') ## significant effect of task
-
-# age
-omnibus.base <- lmer(answer ~ site + task + (1|subid), 
-                data = ratings.ms, 
-                control=lmerControl(optimizer="bobyqa",
-                                             optCtrl=list(maxfun=2e4)))
-omnibus.age <- lmer(answer ~ age.c + task + site + (1|subid), 
-                data = ratings.ms, 
-                control=lmerControl(optimizer="bobyqa",
-                                             optCtrl=list(maxfun=2e4)))
-anova(omnibus.base, omnibus.age, test = 'lrt') ## significant effect of age
-
-### two-way interactions
-## task and age
-omnibus.taskageint <- lmer(answer ~ task:age.c + site + task + age.c +  (1|subid), 
-                data = ratings.ms, 
-                control=lmerControl(optimizer="bobyqa",
-                                             optCtrl=list(maxfun=2e4)))
-anova(omnibus.site, omnibus.taskageint) #significant 2-way interaction of task and age
-
-## site and age
-omnibus.siteageint <- lmer(answer ~ site:age.c + site + task + age.c +  (1|subid), 
-                data = ratings.ms, 
-                control=lmerControl(optimizer="bobyqa",
-                                             optCtrl=list(maxfun=2e4))) #not significant
-anova(omnibus.site, omnibus.siteageint, test= 'lrt') # not significant
-
-## site and task
-omnibus.tasksiteint <- lmer(answer ~ site:task + site + task + age.c +  (1|subid), 
-                data = ratings.ms, 
-                control=lmerControl(optimizer="bobyqa",
-                                             optCtrl=list(maxfun=2e4))) 
-anova(omnibus.site, omnibus.tasksiteint) #significant 2-way interaction of task and site
-
-##three-way interaction
-## start with lowest AIC, which is site x task
-omnibus.step0 <- lmer(answer ~ site:task + site + task + age.c +  (1|subid), 
-                data = ratings.ms, 
-                control=lmerControl(optimizer="bobyqa",
-                                             optCtrl=list(maxfun=2e4)))
-
-#now add the task:age interaction
-omnibus.step1 <-  lmer(answer ~ task:age.c + site:task + site + task + age.c +  (1|subid), 
-                data = ratings.ms, 
-                control=lmerControl(optimizer="bobyqa",
-                                             optCtrl=list(maxfun=2e4)))
-
-##now add site:age.c
-omnibus.step2 <-  lmer(answer ~ site:task + task:age.c + site:age.c + site + task + age.c +  (1|subid), 
-                data = ratings.ms, 
-                control=lmerControl(optimizer="bobyqa",
-                                             optCtrl=list(maxfun=2e4)))
-
-## now the full three-way
-omnibus.full <- lmer(answer ~ site * task * age.c + (1|subid),
-                data = ratings.ms,
-                control=lmerControl(optimizer="bobyqa",
-                                             optCtrl=list(maxfun=2e4)))
-anova(omnibus.step0, omnibus.step1, omnibus.step2, omnibus.full, test = 'lrt')
+car::Anova(omnibus.full, type = "III")
 ```
 
-Summary and pairwise comparisons for this omnibus model
+Pairwise comparisons for this omnibus model
 ```{r}
-summary(omnibus.full)
 library(lsmeans)
 
 emmeans(omnibus.full, pairwise~site*task, adjust = "none")
@@ -803,175 +848,257 @@ tmp <- ratings.ms %>%
   filter(age >= 7 & age <= 11)
 
 #testing for main effects
-# site
-omnibus.base <- lmer(answer ~ task + age.c + (1|subid), 
-                data = tmp, 
-                control=lmerControl(optimizer="bobyqa",
+omnibus.full.limited <- lmer(answer ~ site*task*age.c + (1|subid), 
+                    data = tmp, 
+                    control=lmerControl(optimizer="bobyqa",
                                              optCtrl=list(maxfun=2e4)))
-omnibus.site <- lmer(answer ~ site + task + age.c + (1|subid), 
-                data = tmp, 
-                control=lmerControl(optimizer="bobyqa",
-                                             optCtrl=list(maxfun=2e4)))
-anova(omnibus.base, omnibus.site, test = 'lrt') ## significant effect of site
+car::Anova(omnibus.full.limited, type = "III")
 
-# task
-omnibus.base <- lmer(answer ~ site + age.c + (1|subid), 
-                data = tmp, 
-                control=lmerControl(optimizer="bobyqa",
-                                             optCtrl=list(maxfun=2e4)))
-omnibus.task <- lmer(answer ~ task + site + age.c + (1|subid), 
-                data = tmp, 
-                control=lmerControl(optimizer="bobyqa",
-                                             optCtrl=list(maxfun=2e4)))
-anova(omnibus.base, omnibus.task, test = 'lrt') ## significant effect of task
+emmeans::emmeans(omnibus.full.limited, pairwise~site*task, adjust = "none")
+summary(omnibus.full.limited)
+```
 
-# age
-omnibus.base <- lmer(answer ~ site + task + (1|subid), 
-                data = tmp, 
-                control=lmerControl(optimizer="bobyqa",
-                                             optCtrl=list(maxfun=2e4)))
-omnibus.age <- lmer(answer ~ age.c + task + site + (1|subid), 
-                data = tmp, 
-                control=lmerControl(optimizer="bobyqa",
-                                             optCtrl=list(maxfun=2e4)))
-anova(omnibus.base, omnibus.age, test = 'lrt') ## significant effect of age
+---
+## Comparison of acceptability in different circumstances 
+```{r}
+## visualization of what this looks like per site
+acceptability.ms %>%
+  mutate(q_kind_label = ifelse (q_kind_label == "Rule at school", 
+                                "No rule at school", as.character(q_kind_label)), 
+         q_kind_label = factor(q_kind_label, levels = c("Faraway country", 
+                                                        "No rule at school", 
+                                                        "Everyone else")))%>%
+  mutate(task = factor(task, levels = c("moral", "conv"), 
+                       labels = c("Moral", "Conventional")))%>%
+  ggplot(aes(x = task, y = answer, fill = q_kind_label)) + 
+  stat_summary(fun = mean, position = position_dodge(width = .9),
+               geom="bar", colour = "black") +
+  stat_summary(fun.data = "mean_cl_boot", geom="linerange", 
+               position = position_dodge(width=0.9), size = 1, color = "black") +
+  geom_hline(yintercept = .5, color = "grey", linetype = "dashed") + 
+  theme(legend.position = "right", 
+        legend.key.size = unit(.5, 'cm'), 
+        legend.text = element_text(size = 8), 
+        legend.title = element_text(size = 9), 
+        legend.margin=margin(t = 0, unit='cm'), 
+        axis.text.x = element_text(hjust = 1, angle = 45)) +
+  scale_fill_brewer(palette = "Dark2") +
+  labs(y = "Mean acceptability", 
+       x = "", 
+       fill = "Situation") +
+  facet_grid(~site)
+ggsave("acceptability_ratings.png", height = 3)
+```
 
-### two-way interactions
-## task and age
-omnibus.taskageint <- lmer(answer ~ task:age.c + site + task + age.c +  (1|subid), 
-                data = tmp, 
-                control=lmerControl(optimizer="bobyqa",
-                                             optCtrl=list(maxfun=2e4)))
-anova(omnibus.site, omnibus.taskageint) #significant 2-way interaction of task and age
-
-## site and age
-omnibus.siteageint <- lmer(answer ~ site:age.c + site + task + age.c +  (1|subid), 
-                data = tmp, 
-                control=lmerControl(optimizer="bobyqa",
-                                             optCtrl=list(maxfun=2e4))) #not significant
-anova(omnibus.site, omnibus.siteageint, test= 'lrt') # not significant
-
-## site and task
-omnibus.tasksiteint <- lmer(answer ~ site:task + site + task + age.c +  (1|subid), 
-                data = tmp, 
-                control=lmerControl(optimizer="bobyqa",
-                                             optCtrl=list(maxfun=2e4))) 
-anova(omnibus.site, omnibus.tasksiteint) #significant 2-way interaction of task and site
-
-##three-way interaction
-## start with lowest AIC, which is site x task
-omnibus.step0 <- lmer(answer ~ site:task + site + task + age.c +  (1|subid), 
-                data = tmp, 
-                control=lmerControl(optimizer="bobyqa",
-                                             optCtrl=list(maxfun=2e4)))
-
-#now add the task:age interaction
-omnibus.step1 <-  lmer(answer ~ task:age.c + site:task + site + task + age.c +  (1|subid), 
-                data = tmp, 
-                control=lmerControl(optimizer="bobyqa",
-                                             optCtrl=list(maxfun=2e4)))
-
-##now add site:age.c
-omnibus.step2 <-  lmer(answer ~ site:task + task:age.c + site:age.c + site + task + age.c +  (1|subid), 
-                data = tmp, 
-                control=lmerControl(optimizer="bobyqa",
-                                             optCtrl=list(maxfun=2e4)))
-
-## now the full three-way
-omnibus.full <- lmer(answer ~ site * task * age.c + (1|subid),
-                data = tmp,
-                control=lmerControl(optimizer="bobyqa",
-                                             optCtrl=list(maxfun=2e4)))
-anova(omnibus.step0, omnibus.step1, omnibus.step2, omnibus.full, test = 'lrt') ### No longer significant\
+### ... Do circumstances change response?
 
 
-######## ALSO WITHOUT INDIA#######
-# 
-# ############ Now do it without india
-# tmp <- ratings.ms %>%
-#   filter(site != "India")
-# 
-# #testing for main effects
-# # site
-# omnibus.base <- lmer(answer ~ task + age.c + (1|subid), 
-#                 data = tmp, 
-#                 control=lmerControl(optimizer="bobyqa",
-#                                              optCtrl=list(maxfun=2e4)))
-# omnibus.site <- lmer(answer ~ site + task + age.c + (1|subid), 
-#                 data = tmp, 
-#                 control=lmerControl(optimizer="bobyqa",
-#                                              optCtrl=list(maxfun=2e4)))
-# anova(omnibus.base, omnibus.site, test = 'lrt') ## significant effect of site
-# 
-# # task
-# omnibus.base <- lmer(answer ~ site + age.c + (1|subid), 
-#                 data = tmp, 
-#                 control=lmerControl(optimizer="bobyqa",
-#                                              optCtrl=list(maxfun=2e4)))
-# omnibus.task <- lmer(answer ~ task + site + age.c + (1|subid), 
-#                 data = tmp, 
-#                 control=lmerControl(optimizer="bobyqa",
-#                                              optCtrl=list(maxfun=2e4)))
-# anova(omnibus.base, omnibus.task, test = 'lrt') ## significant effect of task
-# 
-# # age
-# omnibus.base <- lmer(answer ~ site + task + (1|subid), 
-#                 data = tmp, 
-#                 control=lmerControl(optimizer="bobyqa",
-#                                              optCtrl=list(maxfun=2e4)))
-# omnibus.age <- lmer(answer ~ age.c + task + site + (1|subid), 
-#                 data = tmp, 
-#                 control=lmerControl(optimizer="bobyqa",
-#                                              optCtrl=list(maxfun=2e4)))
-# anova(omnibus.base, omnibus.age, test = 'lrt') ## significant effect of age
-# 
-# ### two-way interactions
-# ## task and age
-# omnibus.taskageint <- lmer(answer ~ task:age.c + site + task + age.c +  (1|subid), 
-#                 data = tmp, 
-#                 control=lmerControl(optimizer="bobyqa",
-#                                              optCtrl=list(maxfun=2e4)))
-# anova(omnibus.site, omnibus.taskageint) #significant 2-way interaction of task and age
-# 
-# ## site and age
-# omnibus.siteageint <- lmer(answer ~ site:age.c + site + task + age.c +  (1|subid), 
-#                 data = tmp, 
-#                 control=lmerControl(optimizer="bobyqa",
-#                                              optCtrl=list(maxfun=2e4))) #not significant
-# anova(omnibus.site, omnibus.siteageint, test= 'lrt') # not significant
-# 
-# ## site and task
-# omnibus.tasksiteint <- lmer(answer ~ site:task + site + task + age.c +  (1|subid), 
-#                 data = tmp, 
-#                 control=lmerControl(optimizer="bobyqa",
-#                                              optCtrl=list(maxfun=2e4))) 
-# anova(omnibus.site, omnibus.tasksiteint) #significant 2-way interaction of task and site
-# 
-# ##three-way interaction
-# ## start with lowest AIC, which is site x task
-# omnibus.step0 <- lmer(answer ~ site:task + site + task + age.c +  (1|subid), 
-#                 data = tmp, 
-#                 control=lmerControl(optimizer="bobyqa",
-#                                              optCtrl=list(maxfun=2e4)))
-# 
-# #now add the task:age interaction
-# omnibus.step1 <-  lmer(answer ~ task:age.c + site:task + site + task + age.c +  (1|subid), 
-#                 data = tmp, 
-#                 control=lmerControl(optimizer="bobyqa",
-#                                              optCtrl=list(maxfun=2e4)))
-# 
-# ##now add site:age.c
-# omnibus.step2 <-  lmer(answer ~ site:task + task:age.c + site:age.c + site + task + age.c +  (1|subid), 
-#                 data = tmp, 
-#                 control=lmerControl(optimizer="bobyqa",
-#                                              optCtrl=list(maxfun=2e4)))
-# 
-# ## now the full three-way
-# omnibus.full <- lmer(answer ~ site * task * age.c + (1|subid),
-#                 data = tmp,
-#                 control=lmerControl(optimizer="bobyqa",
-#                                              optCtrl=list(maxfun=2e4)))
-# anova(omnibus.step0, omnibus.step1, omnibus.step2, omnibus.full, test = 'lrt') ### No longer significant
-# summary(omnibus.full)
+#### ...models
+What we want to know here is whether the circumstances change the acceptability of a particular transgression. The approach here is to see whether, for moral and conventional items separately, circumstances meaningfully change acceptability
+
+#### Canada
+
+1.  Significant effect of circumstances for both moral and conventional items
+2.  Moral & Conventional: Rule at school is significantly more permissible than either everyone else or faraway country
+
+```{r}
+## Moral
+## singular fit with item level intercept
+canada_circumstances_moral_base <- glmer(answer ~ age.c + (1|subid),
+                    data = subset(acceptability.ms, 
+                                  site == "Canada" & task == "moral"),
+                    family = 'binomial', 
+                     control=glmerControl(optimizer="bobyqa",
+                                             optCtrl=list(maxfun=2e4)))
+## add q_kind_label
+canada_circumstances_moral <- glmer(answer ~ q_kind_label + age.c + (1|subid),
+                    data = subset(acceptability.ms, 
+                                  site == "Canada" & task == "moral"),
+                    family = 'binomial', 
+                     control=glmerControl(optimizer="bobyqa",
+                                             optCtrl=list(maxfun=2e4)))
+anova(canada_circumstances_moral_base, canada_circumstances_moral, test = 'lrt') # significant effect of q_kind label, chisq = 77.175
+
+## pairwise comparisons
+emmeans::emmeans(canada_circumstances_moral, pairwise~q_kind_label, adjust = "none")
+## significant difference between everyone else and rule at school
+## significant difference between faraway country and rule at school
+
+## conventional
+## singular fit with item level intercept
+canada_circumstances_conv_base <- glmer(answer ~ age.c + (1|subid),
+                    data = subset(acceptability.ms, 
+                                  site == "Canada" & task == "conv"),
+                    family = 'binomial', 
+                     control=glmerControl(optimizer="bobyqa",
+                                             optCtrl=list(maxfun=2e4)))
+## add q_kind_label
+canada_circumstances_conv <- glmer(answer ~ q_kind_label + age.c + (1|subid),
+                    data = subset(acceptability.ms, 
+                                  site == "Canada" & task == "conv"),
+                    family = 'binomial', 
+                     control=glmerControl(optimizer="bobyqa",
+                                             optCtrl=list(maxfun=2e4)))
+anova(canada_circumstances_conv_base, canada_circumstances_conv, test = 'lrt') # significant effect of q_kind label, chisq = 94.73
+
+## pairwise comparisons
+emmeans::emmeans(canada_circumstances_conv, pairwise~q_kind_label, adjust = "none")
+## significant difference between everyone else and rule at school
+## significant difference between faraway country and rule at school
+```
+
+#### India
+
+1.  Signficant effect of circumstance
+2.  Moral and conventional: Everyone else and rule at school are significantly more permissible than faraway country
+
+```{r}
+## Moral
+## singular fit with item level intercept
+india_circumstances_moral_base <- glmer(answer ~ age.c + (1|subid),
+                    data = subset(acceptability.ms, 
+                                  site == "India" & task == "moral"),
+                    family = 'binomial', 
+                     control=glmerControl(optimizer="bobyqa",
+                                             optCtrl=list(maxfun=2e4)))
+## add q_kind_label
+india_circumstances_moral <- glmer(answer ~ q_kind_label + age.c + (1|subid),
+                    data = subset(acceptability.ms, 
+                                  site == "India" & task == "moral"),
+                    family = 'binomial', 
+                     control=glmerControl(optimizer="bobyqa",
+                                             optCtrl=list(maxfun=2e4)))
+anova(india_circumstances_moral_base, india_circumstances_moral, test = 'lrt') # significant effect of q_kind label, chisq = 28.173
+
+## pairwise comparisons
+emmeans::emmeans(india_circumstances_moral, pairwise~q_kind_label, adjust = "none")
+## significant difference between everyone else and faraway country
+## significant difference between faraway country and rule at school
+
+## conventional
+## singular fit with item level intercept
+india_circumstances_conv_base <- glmer(answer ~ age.c + (1|subid),
+                    data = subset(acceptability.ms, 
+                                  site == "India" & task == "conv"),
+                    family = 'binomial', 
+                     control=glmerControl(optimizer="bobyqa",
+                                             optCtrl=list(maxfun=2e4)))
+## add q_kind_label
+india_circumstances_conv <- glmer(answer ~ q_kind_label + age.c + (1|subid),
+                    data = subset(acceptability.ms, 
+                                  site == "India" & task == "conv"),
+                    family = 'binomial', 
+                     control=glmerControl(optimizer="bobyqa",
+                                             optCtrl=list(maxfun=2e4)))
+anova(india_circumstances_conv_base, india_circumstances_conv, test = 'lrt') # significant effect of q_kind label, chisq = 94.76
+
+## pairwise comparisons
+emmeans::emmeans(india_circumstances_conv, pairwise~q_kind_label, adjust = "none")
+## significant difference between everyone else and faraway country
+## significant difference between faraway country and rule at schoo
+## significant different difference between faraway country and rule at school
+```
+
+#### Iran
+1.  Significant effect of circumstances
+2.  Moral: No rule at school significantly higher than everyone else and faraway country
+3.  Conventional: No rule at school is significantly more permissible than everyone else and faraway country
+
+```{r}
+## Moral
+## singular fit with item level intercept
+iran_circumstances_moral_base <- glmer(answer ~ age.c + (1|subid),
+                    data = subset(acceptability.ms, 
+                                  site == "Iran" & task == "moral"),
+                    family = 'binomial', 
+                     control=glmerControl(optimizer="bobyqa",
+                                             optCtrl=list(maxfun=2e4)))
+## add q_kind_label
+iran_circumstances_moral <- glmer(answer ~ q_kind_label + age.c + (1|subid),
+                    data = subset(acceptability.ms, 
+                                  site == "Iran" & task == "moral"),
+                    family = 'binomial', 
+                     control=glmerControl(optimizer="bobyqa",
+                                             optCtrl=list(maxfun=2e4)))
+anova(iran_circumstances_moral_base, iran_circumstances_moral, test = 'lrt') # significant effect of q_kind label, chisq = 39.056
+
+## pairwise comparisons
+emmeans::emmeans(iran_circumstances_moral, pairwise~q_kind_label, adjust = "none")
+## significant difference between everyone else and rule at school
+## significant difference between faraway country and rule at school
+
+## conventional
+## singular fit with item level intercept
+iran_circumstances_conv_base <- glmer(answer ~ age.c + (1|subid),
+                    data = subset(acceptability.ms, 
+                                  site == "Iran" & task == "conv"),
+                    family = 'binomial', 
+                     control=glmerControl(optimizer="bobyqa",
+                                             optCtrl=list(maxfun=2e4)))
+## add q_kind_label
+iran_circumstances_conv <- glmer(answer ~ q_kind_label + age.c + (1|subid),
+                    data = subset(acceptability.ms, 
+                                  site == "Iran" & task == "conv"),
+                    family = 'binomial', 
+                     control=glmerControl(optimizer="bobyqa",
+                                             optCtrl=list(maxfun=2e4)))
+anova(iran_circumstances_conv_base, iran_circumstances_conv, test = 'lrt') # significant effect of q_kind label, chisq = 21.899
+
+## pairwise comparisons
+emmeans::emmeans(iran_circumstances_conv, pairwise~q_kind_label, adjust = "none")
+## significant difference between everyone else and rule at school
+## significant difference between faraway country and rule at school
+
+```
+
+#### Korea
+
+```{r}
+## Moral
+## singular fit with item level intercept
+korea_circumstances_moral_base <- glmer(answer ~ age.c + (1|subid),
+                    data = subset(acceptability.ms, 
+                                  site == "Korea" & task == "moral"),
+                    family = 'binomial', 
+                     control=glmerControl(optimizer="bobyqa",
+                                             optCtrl=list(maxfun=2e4)))
+## add q_kind_label
+korea_circumstances_moral <- glmer(answer ~ q_kind_label + age.c + (1|subid),
+                    data = subset(acceptability.ms, 
+                                  site == "Korea" & task == "moral"),
+                    family = 'binomial', 
+                     control=glmerControl(optimizer="bobyqa",
+                                             optCtrl=list(maxfun=2e4)))
+anova(korea_circumstances_moral_base, korea_circumstances_moral, test = 'lrt') # significant effect of q_kind label, chisq = 17.209
+
+## pairwise comparisons
+emmeans::emmeans(korea_circumstances_moral, pairwise~q_kind_label, adjust = "none")
+## significant difference between everyone else and faraway country
+## marginal difference between everyone else and rule at school
+## marginal difference between faraway country and rule at school
+
+## conventional
+## singular fit with item level intercept
+korea_circumstances_conv_base <- glmer(answer ~ age.c + (1|subid),
+                    data = subset(acceptability.ms, 
+                                  site == "Korea" & task == "conv"),
+                    family = 'binomial', 
+                     control=glmerControl(optimizer="bobyqa",
+                                             optCtrl=list(maxfun=2e4)))
+## add q_kind_label
+korea_circumstances_conv <- glmer(answer ~ q_kind_label + age.c + (1|subid),
+                    data = subset(acceptability.ms, 
+                                  site == "Korea" & task == "conv"),
+                    family = 'binomial', 
+                     control=glmerControl(optimizer="bobyqa",
+                                             optCtrl=list(maxfun=2e4)))
+anova(korea_circumstances_conv_base, korea_circumstances_conv, test = 'lrt') # significant effect of q_kind label, chisq = 54.377
+
+## pairwise comparisons
+emmeans::emmeans(korea_circumstances_conv, pairwise~q_kind_label, adjust = "none")
+## significant difference between everyone else and farway country
+## significant difference between everyone else and rule at school
+## significant difference between faraway country and rule at school
+
 ```
 
