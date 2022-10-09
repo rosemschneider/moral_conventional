@@ -29,6 +29,7 @@ library(ggpubr)
 library(broom)
 library(broom.mixed)
 library(lmerTest)
+library(wesanderson)
 
 ## Leftover data manipulations
 # leftover data manipulations
@@ -99,6 +100,11 @@ study2_data %>%
 
 ### Visualization of mean rating (all items collapsed) by site
 ```{r}
+library(yarrr)
+library(ggthemes)
+
+my.cols <- c("#E7695DFF", "#6B8993FF", "#F6F0D4FF", "#95CE8AFF")
+
 study2_data %>% 
   filter(q_kind == 0)%>%
   mutate(task = factor(task, levels = c("moral", "conv", "conv.iran", "religious"), 
@@ -121,10 +127,15 @@ study2_data %>%
         legend.key.size = unit(.5, 'cm'), 
         legend.text = element_text(size = 10), 
         legend.title = element_text(size = 11), 
-        legend.margin=margin(t = 0, unit='cm')) +
-  langcog::scale_color_solarized() + 
-  langcog::scale_fill_solarized() + 
-  labs(y = "Mean rating", 
+        legend.margin=margin(t = 0, unit='cm'), 
+         text = element_text(family = "Times New Roman")) +
+  langcog::scale_color_solarized() +
+  langcog::scale_fill_solarized() +
+  #  scale_color_manual(values = my.cols) +
+  # scale_fill_manual(values = my.cols) +
+  # scale_color_hc("darkunica") + 
+  # scale_fill_hc("darkunica") +
+  labs(y = "Mean acceptability rating", 
        x = "Transgression Type") + 
   scale_y_continuous(breaks = seq(1,6, 1))
 ggsave("study2_ratings.png", height = 3, width = 6)
@@ -212,8 +223,8 @@ iran.rating.base <- lmer(answer ~ task+age.c + (1|subid),
                     data = ratings.ms)
 anova(iran.rating.base, iran.rating, test = 'lrt') #it's not, so don't include it
 
-## get the chisq of the task & age
-iran.base.base <-  lmer(answer ~ task + (1|subid), 
+## get the chisq of the task
+iran.base.base <-  lmer(answer ~ age.c + (1|subid), 
                     data = ratings.ms)
 anova(iran.base.base, iran.rating.base)
 ```
@@ -249,8 +260,8 @@ study2_data %>%
   mutate(task = factor(task, levels = c("moral", "conv", "conv.iran", "religious"), 
                        labels = c("Moral", "Conventional", "Conventional - Iran", "Religious")), 
          q_kind_label = ifelse(q_kind_label == "Rule at school",
-                               "No rule at school", as.character(q_kind_label)), 
-         q_kind_label = factor(q_kind_label, levels = c("Faraway country", "No rule at school",
+                               "No rule against it", as.character(q_kind_label)), 
+         q_kind_label = factor(q_kind_label, levels = c("Faraway country", "No rule against it",
                                                         "Everyone else", "Foreigner", 
                                                         "Non-Muslim")))%>%
   ggplot(aes(x = task, y = answer, fill = task, color = task)) + 
@@ -266,9 +277,12 @@ study2_data %>%
         legend.key.size = unit(.5, 'cm'), 
         legend.text = element_text(size = 10), 
         legend.title = element_text(size = 11), 
-        legend.margin=margin(t = 0, unit='cm')) +
-  langcog::scale_color_solarized() + 
-  langcog::scale_fill_solarized() + 
+        legend.margin=margin(t = 0, unit='cm'), 
+         text = element_text(family = "Times New Roman")) +
+  langcog::scale_color_solarized() +
+  langcog::scale_fill_solarized() +
+  # scale_fill_hc("darkunica") + 
+  # scale_color_hc("darkunica")+
   labs(y = "Mean acceptability rating", 
        x = "", 
        fill = "Transgression") + 
@@ -302,9 +316,12 @@ study2_data %>%
         legend.key.size = unit(.5, 'cm'), 
         legend.text = element_text(size = 10), 
         legend.title = element_text(size = 11), 
-        legend.margin=margin(t = 0, unit='cm')) +
-  langcog::scale_color_solarized() + 
-  langcog::scale_fill_solarized() + 
+        legend.margin=margin(t = 0, unit='cm'),
+         text = element_text(family = "Times New Roman")) +
+  langcog::scale_color_solarized() +
+  langcog::scale_fill_solarized() +
+  # scale_color_hc("darkunica") + 
+  # scale_fill_hc("darkunica") +
   labs(y = "Mean rating", 
        x = "", 
        fill = "Transgression") + 
@@ -373,7 +390,7 @@ anova(faraway.base, faraway, test = 'lrt') ## the interaction does not significa
 
 ```{r}
 ##summary of main effects
-knitr::kable(summary(faraway.base)$coef)
+knitr::kable(summary(faraway.8ase)$coef)
 ```
 
 #### Rule at school: Answer ~ Task + Age + (1|subid)
@@ -432,6 +449,7 @@ anova(foreigner.base, foreigner, test = 'lrt')
 
 ```{r}
 ##summary of main effects
+car::Anova(foreigner, type = "III")
 knitr::kable(summary(foreigner)$coef)
 ```
 
@@ -465,6 +483,7 @@ anova(muslim.base, muslim, test = 'lrt')
 
 ```{r}
 ##summary of main effects
+car::Anova(muslim, type = "III")
 knitr::kable(summary(muslim)$coef)
 ```
 
@@ -478,15 +497,19 @@ knitr::kable(summary(muslim)$coef)
 5.  Significant effect of age ($\beta$ = -1.31, *p* < .001)
 
 ```{r, include = FALSE}
+## we're going to make the reference group here reflect predictions
+tmp <- acceptability.ms %>%
+  mutate(task = factor(task, levels = c("religious", "conv", "conv.iran", "moral")))
+
 haram <- glmer(answer ~ task*age.c + (1|subid),
-                    data = subset(acceptability.ms, q_kind == 6),
+                    data = subset(tmp, q_kind == 6),
                     family = 'binomial', 
                    control=glmerControl(optimizer="bobyqa",
                                              optCtrl=list(maxfun=2e4))) # converges
 
 ## is the interaction between age and task significant?
 haram.base <- glmer(answer ~ task+age.c + (1|subid),
-                    data = subset(acceptability.ms, q_kind == 6), 
+                    data = subset(tmp, q_kind == 6), 
                     family = 'binomial', 
                     control=glmerControl(optimizer="bobyqa",
                                              optCtrl=list(maxfun=2e4))) # converges
@@ -537,15 +560,20 @@ knitr::kable(summary(illegal.base)$coef)
 4.  Significant difference between moral and religious ($\beta$ = -2.93, *p* < .001)
 5.  Significant effect of age ($\beta$ = -0.54, *p* = .02)
 ```{r, include = FALSE}
+# reset the reference group to make sense of the analyses
+tmp <- acceptability.ms %>%
+  mutate(task = factor(task, levels = c("conv.iran", "conv", 
+                                        "moral", "religious")))
+
 zesht <- glmer(as.factor(answer) ~ task*age.c + (1|subid),
-                    data = subset(acceptability.ms, q_kind == 8),
+                    data = subset(tmp, q_kind == 8),
                     family = 'binomial', 
                    control=glmerControl(optimizer="bobyqa",
                                              optCtrl=list(maxfun=2e4))) # converges
 
 ## is the interaction between age and task significant?
 zesht.base <- glmer(as.factor(answer) ~ task+age.c + (1|subid),
-                    data = subset(acceptability.ms, q_kind == 8), 
+                    data = subset(tmp, q_kind == 8), 
                     family = 'binomial', 
                     control=glmerControl(optimizer="bobyqa",
                                              optCtrl=list(maxfun=2e4))) # converges
@@ -590,7 +618,8 @@ acceptability.limited %>%
         legend.text = element_text(size = 8), 
         legend.title = element_text(size = 9), 
         legend.margin=margin(t = 0, unit='cm'), 
-        axis.text.x = element_text(hjust = 1, angle = 45)) +
+        axis.text.x = element_text(hjust = 1, angle = 45), 
+         text = element_text(family = "Times New Roman")) +
   scale_fill_brewer(palette = "Dark2") +
   labs(y = "Mean acceptability", 
        x = "", 
@@ -701,11 +730,13 @@ justifications %>%
   ggplot(aes(x = Final.theme, y = n, fill = Final.theme))+
   geom_bar(stat = "identity", color = "black") +
   theme(axis.text.x = element_text(hjust = 1, angle = 45), 
-        legend.position = "none") + 
+        legend.position = "none", 
+         text = element_text(family = "Times New Roman")) + 
   labs(x = "Justification theme", 
        y = "Frequency") + 
   facet_grid(~transgression) +
   langcog::scale_fill_solarized("Justification theme")
+  # scale_fill_hc("darkunica")
 ggsave("justifications_theme.png", width = 9, height = 3.5)
 ```
 
