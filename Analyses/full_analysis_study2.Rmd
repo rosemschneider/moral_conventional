@@ -232,6 +232,9 @@ anova(iran.base.base, iran.rating.base)
 ```{r}
 #summary of item model
 knitr::kable(summary(iran.rating.base)$coef)
+
+## pairwise comparisons
+emmeans::emmeans(iran.rating.base, pairwise~task, adjust = "none")
 ```
 
 =====
@@ -283,7 +286,7 @@ study2_data %>%
   langcog::scale_fill_solarized() +
   # scale_fill_hc("darkunica") + 
   # scale_color_hc("darkunica")+
-  labs(y = "Mean acceptability rating", 
+  labs(y = "Mean permissibility rating", 
        x = "", 
        fill = "Transgression") + 
   ggtitle("Would it be okay...") +

@@ -95,8 +95,31 @@ study1_data %>%
 ## Ratings for moral and conventional items by testing site
 ### Descriptives
 ```{r}
-study1_data %>%
+x <- study1_data %>%
   filter(q_kind == 0)%>%
+  group_by(site, task)%>%
+  summarise_at('answer', 
+               list(~mean(., na.rm=T), 
+                    ~sd(., na.rm=T),
+                    ~median(., na.rm=T),
+                    ~min(., na.rm=T),
+                    ~max(., na.rm=T),
+                    ~sum(!is.na(.))))%>%
+  dplyr::rename("n" = "sum")%>%
+  dplyr::select(site, task, n, mean, sd, median, min, max)%>%
+  knitr::kable()
+
+#testing recoding
+tmp <- study1_data %>%
+  mutate(answer = case_when(answer == 1 ~ 6, 
+            answer == 2 ~ 5, 
+            answer == 3 ~ 4, 
+            answer == 4 ~ 3,
+            answer == 5 ~ 2, 
+            answer == 6 ~ 1))
+
+y <- tmp %>%
+   filter(q_kind == 0)%>%
   group_by(site, task)%>%
   summarise_at('answer', 
                list(~mean(., na.rm=T), 
@@ -166,8 +189,6 @@ study1_data %>%
   labs(x = "Age", 
        y = "Acceptability rating") +
   theme(legend.position = "top", 
-        axis.text.x = element_blank(), 
-        axis.ticks.x = element_blank(), 
         legend.key.size = unit(.5, 'cm'), 
         legend.text = element_text(size = 10), 
         legend.title = element_text(size = 11), 
@@ -395,7 +416,7 @@ study1_data %>%
   # scale_fill_brewer(palette = "Dark2") +
   langcog::scale_fill_solarized()+
   # scale_fill_hc("darkunica") +
-  labs(y = "Mean acceptability rating", 
+  labs(y = "Mean permissibility rating", 
        x = "Site", 
        fill = "Transgression")  +
   theme(axis.text.x = element_text(hjust = 1, angle = 45), 
@@ -405,7 +426,7 @@ study1_data %>%
         legend.margin=margin(t = 0, unit='cm'), 
         plot.title = element_text(size = 12), 
          text = element_text(family = "Times New Roman")) +
-  guides(fill = guide_legend(title.position = "top")) +
+  guides(fill = guide_legend(title.position = "top" )) +
   scale_y_continuous(breaks = seq(0, 1,.25)) + 
   ggtitle("Would it be okay...")
 ggsave("mean_acceptability.png", height = 3, width = 8)
